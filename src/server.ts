@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import { query } from "./db"; // db 모듈에서 query 함수를 가져옵니다.
+import postsRouter from "./apis/posts/posts.route"; // posts 라우터를 import 합니다.
 
 const app = express();
 const port = 3000;
@@ -20,23 +21,21 @@ const corsOptions = {
   },
 };
 
-// 특정 출처만 허용하도록 CORS 미들웨어 적용
+// CORS 미들웨어 적용
 app.use(cors(corsOptions));
+
+// JSON 파싱을 위한 미들웨어 추가
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 app.get("/", (req, res) => {
   res.send("Hello, I am the TypeScript backend!");
 });
 
-app.listen(port, () => {
-  console.log(`Backend server is running on http://localhost:${port}`);
-});
+// '/api/posts' 경로로 오는 모든 요청은 postsRouter가 처리하도록 등록
+app.use("/api/posts", postsRouter);
 
-// 새로운 API 엔드포인트 추가
-app.get("/api/test", (req, res) => {
-  res.send(Date.now());
-});
-
-// DB 연결 테스트를 위한 즉시 실행 함수
+// DB 연결 테스트를 위한 즉시 실행 함수 (유지)
 (async () => {
   try {
     const result = await query("SELECT NOW()"); // DB의 현재 시간을 조회하는 쿼리
@@ -48,3 +47,7 @@ app.get("/api/test", (req, res) => {
     console.error("🔥 Database connection failed.", err);
   }
 })();
+
+app.listen(port, () => {
+  console.log(`🚀 Backend server is running on http://localhost:${port}`);
+});
