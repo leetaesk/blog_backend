@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import { query } from "./db"; // db 모듈에서 query 함수를 가져옵니다.
 
 const app = express();
 const port = 3000;
@@ -32,5 +33,18 @@ app.listen(port, () => {
 
 // 새로운 API 엔드포인트 추가
 app.get("/api/test", (req, res) => {
-  res.send("Hello Success connect the backend!");
+  res.send(Date.now());
 });
+
+// DB 연결 테스트를 위한 즉시 실행 함수
+(async () => {
+  try {
+    const result = await query("SELECT NOW()"); // DB의 현재 시간을 조회하는 쿼리
+    console.log(
+      "✅ Database connection successful. Current time:",
+      result.rows[0].now
+    );
+  } catch (err) {
+    console.error("🔥 Database connection failed.", err);
+  }
+})();
