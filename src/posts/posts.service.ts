@@ -1,7 +1,7 @@
-import { query } from "../../db";
+import { query } from "../db";
 import { GetArchiveRequestDto, GetArchiveResultType } from "./posts.dto";
 
-const POSTS_PER_PAGE = 10;
+const POSTS_PER_PAGE = 8;
 
 export const getArchive = async (
   queryParams: GetArchiveRequestDto

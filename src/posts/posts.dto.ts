@@ -1,6 +1,6 @@
 // src/api/posts/posts.dto.ts
 
-import { CommonResponseDto } from "../../types/common.types";
+import { CommonResponseDto } from "../types/common.types";
 
 // 나중에 별도 파일로 분리될 수 있는 공통 타입
 export interface Category {

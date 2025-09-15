@@ -1,7 +1,8 @@
 import express from "express";
 import cors from "cors";
 import { query } from "./db"; // db 모듈에서 query 함수를 가져옵니다.
-import postsRouter from "./apis/posts/posts.route"; // posts 라우터를 import 합니다.
+import postsRouter from "./posts/posts.route"; // posts 라우터를 import 합니다.
+import categoriesRouter from "./categories/categories.route";
 
 const app = express();
 const port = 3000;
@@ -32,8 +33,9 @@ app.get("/", (req, res) => {
   res.send("Hello, I am the TypeScript backend!");
 });
 
-// '/api/posts' 경로로 오는 모든 요청은 postsRouter가 처리하도록 등록
+// api 등록
 app.use("/api/posts", postsRouter);
+app.use("/api/categories", categoriesRouter);
 
 // DB 연결 테스트를 위한 즉시 실행 함수 (유지)
 (async () => {
