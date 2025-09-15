@@ -13,13 +13,13 @@ const allowedOrigins = ["http://localhost:5173"];
 // CORS 옵션 설정
 const corsOptions = {
   origin: function (origin: any, callback: any) {
-    // 요청의 Origin이 허용된 목록에 있는지 확인
     if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
-      callback(null, true); // 허용
+      callback(null, true);
     } else {
-      callback(new Error("Not allowed by CORS")); // 거부
+      callback(new Error("Not allowed by CORS"));
     }
   },
+  credentials: true,
 };
 
 // CORS 미들웨어 적용
