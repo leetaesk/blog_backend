@@ -1,37 +1,53 @@
+// src/api/posts/posts.service.ts
+
 import { query } from "../db";
 import { GetArchiveRequestDto, GetArchiveResultType } from "./posts.dto";
 
-const POSTS_PER_PAGE = 8;
+//기본값 12
+const POSTS_PER_PAGE = 12;
 
 export const getArchive = async (
   queryParams: GetArchiveRequestDto
 ): Promise<GetArchiveResultType> => {
   try {
-    const { page, category } = queryParams;
+    const { page, category, search } = queryParams;
     const limit = queryParams.limit || POSTS_PER_PAGE;
     const offset = (page - 1) * limit;
 
-    // --- 1. 전체 게시글 수 조회 쿼리 ---
-    let countQueryStr = "SELECT COUNT(*) FROM posts";
-    const countParams: (string | number)[] = [];
+    const filterConditions: string[] = [];
+    const filterParams: (string | number)[] = [];
+
     if (category) {
-      countQueryStr +=
-        " JOIN categories ON posts.category_id = categories.id WHERE categories.name = $1";
-      countParams.push(category);
+      filterConditions.push(`c.name = $${filterParams.length + 1}`);
+      filterParams.push(category);
     }
 
-    console.log("[DEBUG] Executing Count Query:", countQueryStr, countParams);
-    const countResult = await query(countQueryStr, countParams);
+    if (search) {
+      const searchTerm = `%${search}%`;
+      filterConditions.push(`p.title ILIKE $${filterParams.length + 1}`);
+      filterParams.push(searchTerm);
+    }
+
+    const whereClause =
+      filterConditions.length > 0
+        ? `WHERE ${filterConditions.join(" AND ")}`
+        : "";
+
+    const joinClause = category
+      ? "JOIN categories c ON p.category_id = c.id"
+      : "";
+    const countQueryStr = `SELECT COUNT(*) FROM posts p ${joinClause} ${whereClause}`;
+
+    console.log("[DEBUG] Executing Count Query:", countQueryStr, filterParams);
+    const countResult = await query(countQueryStr, filterParams);
 
     const totalPostCount =
       countResult.rows.length > 0 ? parseInt(countResult.rows[0].count, 10) : 0;
     const totalPage = Math.ceil(totalPostCount / limit);
 
-    // --- ✨ 페이지 유효성 검사 로직 추가 ---
-    // 요청된 페이지가 전체 페이지 수를 초과하고, 게시글이 하나 이상 존재하는 경우
     if (page > totalPage && totalPostCount > 0) {
       return {
-        posts: [], // 빈 게시글 배열을 반환
+        posts: [],
         pagination: {
           totalPostCount,
           totalPage,
@@ -42,8 +58,7 @@ export const getArchive = async (
       };
     }
 
-    // --- 2. 게시글 목록 조회 쿼리 ---
-    let postsQueryStr = `
+    const postsQueryStr = `
       SELECT 
           p.id, 
           p.title, 
@@ -55,22 +70,17 @@ export const getArchive = async (
           (SELECT COUNT(*) FROM comments WHERE post_id = p.id) AS "commentCount"
       FROM posts p
       LEFT JOIN categories c ON p.category_id = c.id
+      ${whereClause}
+      ORDER BY p.created_at DESC 
+      LIMIT $${filterParams.length + 1} 
+      OFFSET $${filterParams.length + 2}
     `;
-    const postsParams: (string | number)[] = [];
-    let paramIndex = 1;
 
-    if (category) {
-      postsQueryStr += ` WHERE c.name = $${paramIndex++}`;
-      postsParams.push(category);
-    }
-
-    postsQueryStr += ` ORDER BY p.created_at DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
-    postsParams.push(limit, offset);
+    const postsParams = [...filterParams, limit, offset];
 
     console.log("[DEBUG] Executing Posts Query:", postsQueryStr, postsParams);
     const postsResult = await query(postsQueryStr, postsParams);
 
-    // --- 3. 결과 데이터 가공 ---
     const posts = postsResult.rows.map((row) => ({
       id: row.id,
       title: row.title,

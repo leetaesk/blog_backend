@@ -11,6 +11,8 @@ export const getArchiveController = async (req: Request, res: Response) => {
       page: parseInt(req.query.page as string, 10) || 1,
       limit: parseInt(req.query.limit as string, 10) || 10,
       category: req.query.category as string | undefined,
+      // ✨ 이 부분을 추가해주세요!
+      search: req.query.search as string | undefined,
     };
 
     // 2. 유효성 검사 (page는 1 이상이어야 함)

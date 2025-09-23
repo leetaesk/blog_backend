@@ -16,6 +16,7 @@ export interface GetArchiveRequestDto {
   page: number;
   limit: number; // 한 페이지에 보여줄 게시글 수
   category?: string; // 카테고리 이름
+  search?: string; //검색어
 }
 
 interface ArchiveItem {
