@@ -20,7 +20,7 @@ export interface GetArchiveRequestDto {
 }
 
 interface ArchiveItem {
-  id: number; // 프론트엔드에서 string으로 받았지만, DB에서는 number입니다.
+  id: number;
   title: string;
   summary: string;
   createdAt: string;
@@ -49,3 +49,45 @@ export interface GetArchiveResultType {
  * @description /archive 페이지 게시글 목록 조회 API의 최종 응답 형태를 정의합니다.
  */
 export type GetArchiveResponseDto = CommonResponseDto<GetArchiveResultType>;
+
+// ===== ✨ 게시글 상세 조회 API DTO 추가 ===== //
+
+// 작성자 정보 타입
+interface Author {
+  id: number;
+  nickname: string;
+}
+
+// 태그 정보 타입
+interface Tag {
+  id: number;
+  name: string;
+}
+
+/**
+ * GET /api/posts/:postId - 응답의 `result` 필드 DTO
+ * @description 게시글 상세 조회 API 응답의 실제 데이터 부분을 정의합니다.
+ */
+
+export interface GetPostByIdRequestDto {
+  postId: number;
+}
+export interface GetPostByIdResultType {
+  id: number;
+  title: string;
+  content: string;
+  thumbnailUrl: string | null;
+  views: number;
+  createdAt: string; // 'YYYY-MM-DD HH:MI:SS' 형식
+  updatedAt: string; // 'YYYY-MM-DD HH:MI:SS' 형식
+  author: Author;
+  category: Category | null; // 카테고리가 없을 수 있음
+  tags: Tag[]; // 태그는 여러 개일 수 있고, 없을 수도 있음
+  commentCount: number;
+}
+
+/**
+ * GET /api/posts/:postId - 최종 응답 DTO
+ * @description 게시글 상세 조회 API의 최종 응답 형태를 정의합니다.
+ */
+export type GetPostByIdResponseDto = CommonResponseDto<GetPostByIdResultType>;
