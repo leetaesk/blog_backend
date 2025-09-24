@@ -1,5 +1,6 @@
 // src/api/posts/posts.service.ts
 
+import { marked } from "marked";
 import { query } from "../db";
 import {
   GetArchiveRequestDto,
@@ -115,19 +116,21 @@ export const getArchive = async (
   }
 };
 
-// ===== ✨ 게시글 상세 조회 서비스 추가 ===== //
+// ===== ✨ 게시글 상세 조회 서비스 수정 ===== //
 export const getPostById = async ({
   postId,
 }: GetPostByIdRequestDto): Promise<GetPostByIdResultType | null> => {
   try {
-    // 1. 게시글 기본 정보, 작성자, 카테고리 조회 (JOIN)
+    // 1. 게시글 기본 정보 조회 (작성자, 카테고리 정보 포함)
     const postQueryStr = `
       SELECT
         p.id, p.title, p.content, p.thumbnail_url AS "thumbnailUrl", p.views,
         to_char(p.created_at, 'YYYY-MM-DD HH24:MI:SS') AS "createdAt",
         to_char(p.updated_at, 'YYYY-MM-DD HH24:MI:SS') AS "updatedAt",
-        u.id AS "authorId", u.nickname AS "authorNickname",
-        c.id AS "categoryId", c.name AS "categoryName",
+        u.id AS "authorId",
+        u.nickname AS "authorNickname",
+        c.id AS "categoryId",
+        c.name AS "categoryName",
         (SELECT COUNT(*) FROM comments WHERE post_id = p.id) AS "commentCount"
       FROM posts p
       JOIN users u ON p.user_id = u.id
@@ -137,25 +140,27 @@ export const getPostById = async ({
     const postResult = await query(postQueryStr, [postId]);
 
     if (postResult.rows.length === 0) {
-      return null; // 게시글이 없으면 null 반환
+      return null;
     }
     const postRow = postResult.rows[0];
 
     // 2. 게시글 태그 목록 조회
     const tagsQueryStr = `
-      SELECT t.id, t.name
-      FROM tags t
+      SELECT t.id, t.name FROM tags t
       JOIN post_tags pt ON t.id = pt.tag_id
       WHERE pt.post_id = $1
       ORDER BY t.name ASC
     `;
     const tagsResult = await query(tagsQueryStr, [postId]);
 
-    // 3. 최종 데이터 형태로 조립
+    // ✨ 3. 최종 데이터 조립 전, 마크다운을 HTML로 비동기 변환합니다.
+    const htmlContent = await marked.parse(postRow.content || ""); // content가 null일 경우를 대비해 기본값 추가
+
+    // 4. 최종 데이터 형태로 조립
     const result: GetPostByIdResultType = {
       id: postRow.id,
       title: postRow.title,
-      content: postRow.content,
+      content: htmlContent, // ✨ 변환된 HTML content를 할당
       thumbnailUrl: postRow.thumbnailUrl,
       views: postRow.views,
       createdAt: postRow.createdAt,
@@ -167,7 +172,7 @@ export const getPostById = async ({
       category: postRow.categoryId
         ? { id: postRow.categoryId, name: postRow.categoryName }
         : null,
-      tags: tagsResult.rows, // tagsResult.rows가 이미 {id, name}[] 형태임
+      tags: tagsResult.rows,
       commentCount: parseInt(postRow.commentCount, 10),
     };
 
