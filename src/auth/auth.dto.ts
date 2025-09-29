@@ -1,5 +1,7 @@
 // src/api/auth/auth.dto.ts
 
+import { CommonResponseDto } from "../types/common.types";
+
 // ============================
 // 1. 클라이언트 <-> 우리 서버
 // ============================
@@ -16,12 +18,24 @@ export type User = "user" | "admin";
 /**
  * @description 서버 -> 클라이언트: 로그인 성공 시 응답
  */
-export interface KakaoLoginResponseDto {
+
+export interface KakaoLoginResultType {
   accessToken: string;
   refreshToken: string;
   userId: number; // 우리 서비스의 고유 사용자 ID
   userRole: User;
 }
+
+export type KakaoLoginResponseDto = CommonResponseDto<KakaoLoginResultType>;
+
+// ✨ ===== 로그아웃 응답 DTO 추가 ===== ✨
+/**
+ * @description 서버 -> 클라이언트: 로그아웃 성공 시 응답
+ */
+export interface LogoutResultType {
+  message: string;
+}
+export type LogoutResponseDto = CommonResponseDto<LogoutResultType>;
 
 // ============================
 // 2. 우리 서버 <-> 카카오 서버 (내부용)
@@ -67,4 +81,12 @@ export interface KakaoUserResponseDto {
   id: number; // 카카오가 발급하는 고유 사용자 ID
   connected_at: string; // ISO 8601 형식의 UTC 시간
   properties: KakaoProfile;
+}
+
+// ✨ ===== 카카오 로그아웃 응답 DTO 추가 ===== ✨
+/**
+ * @description 우리 서버 -> 카카오: 로그아웃 요청의 응답 DTO
+ */
+export interface KakaoLogoutResponseDto {
+  id: number; // 로그아웃된 사용자의 회원번호
 }

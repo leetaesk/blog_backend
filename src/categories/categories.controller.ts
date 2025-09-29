@@ -1,12 +1,11 @@
-// src/categories/categories.controller.ts
-
-import { Request, Response } from "express";
+import { Request, Response, NextFunction } from "express"; // ✨ NextFunction 추가
 import { getCategories } from "./categories.service";
 
-/**
- * GET /api/categories 요청을 처리하는 컨트롤러
- */
-export const handleGetCategories = async (req: Request, res: Response) => {
+export const handleGetCategories = async (
+  req: Request,
+  res: Response,
+  next: NextFunction // ✨ next 추가
+) => {
   try {
     const categories = await getCategories();
 
@@ -19,10 +18,7 @@ export const handleGetCategories = async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({
-      isSuccess: false,
-      code: "INTERNAL_SERVER_ERROR",
-      message: "서버 에러가 발생했습니다.",
-    });
+    // ✨ 에러를 중앙 핸들러로 전달
+    next(error);
   }
 };

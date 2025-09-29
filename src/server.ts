@@ -1,17 +1,14 @@
 import express from "express";
 import cors from "cors";
-import { query } from "./db"; // db 모듈에서 query 함수를 가져옵니다.
-import postsRouter from "./posts/posts.route"; // posts 라우터를 import 합니다.
+import { query } from "./db";
+import postsRouter from "./posts/posts.route";
 import categoriesRouter from "./categories/categories.route";
 import authRouter from "./auth/auth.route";
 
 const app = express();
 const port = 3000;
 
-// 허용할 출처(Origin) 목록
 const allowedOrigins = ["http://localhost:5173"];
-
-// CORS 옵션 설정
 const corsOptions = {
   origin: function (origin: any, callback: any) {
     if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
@@ -23,10 +20,7 @@ const corsOptions = {
   credentials: true,
 };
 
-// CORS 미들웨어 적용
 app.use(cors(corsOptions));
-
-// JSON 파싱을 위한 미들웨어 추가
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -39,10 +33,37 @@ app.use("/api/posts", postsRouter);
 app.use("/api/categories", categoriesRouter);
 app.use("/api/auth", authRouter);
 
-// DB 연결 테스트를 위한 즉시 실행 함수 (유지)
+// ✨ ===== 중앙 에러 핸들링 미들웨어 추가 ===== ✨
+// ❗ 모든 라우터 등록 후에, 그리고 서버 실행(listen) 전에 위치해야 합니다.
+app.use(
+  (
+    err: any,
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction
+  ) => {
+    // Axios 에러인 경우 상세 에러를 로그에 남깁니다.
+    if (err.isAxiosError) {
+      console.error("🔥🔥🔥 Kakao API Error Details:", err.response?.data);
+    } else {
+      console.error("🔥🔥🔥 Unhandled Error:", err.stack);
+    }
+
+    const statusCode = err.status || 500;
+    const message = err.message || "서버 내부 에러가 발생했습니다.";
+
+    res.status(statusCode).json({
+      isSuccess: false,
+      code: err.code || "UNKNOWN_ERROR",
+      message,
+    });
+  }
+);
+
+// DB 연결 테스트
 (async () => {
   try {
-    const result = await query("SELECT NOW()"); // DB의 현재 시간을 조회하는 쿼리
+    const result = await query("SELECT NOW()");
     console.log(
       "✅ Database connection successful. Current time:",
       result.rows[0].now
