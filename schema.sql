@@ -1,12 +1,11 @@
 -- Users Table: 회원 정보
 CREATE TABLE "users" (
-  "id" SERIAL PRIMARY KEY,
-  "email" VARCHAR(255) UNIQUE NOT NULL,
-  "password" VARCHAR(255) NOT NULL,
-  "name" VARCHAR(255) NOT NULL,
-  "nickname" VARCHAR(50) UNIQUE NOT NULL,
-  "role" VARCHAR(10) NOT NULL DEFAULT 'user' CHECK("role" IN ('admin', 'user')),
-  "created_at" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    "id" SERIAL PRIMARY KEY,
+    "kakao_id" VARCHAR(255) UNIQUE NOT NULL,
+    "nickname" VARCHAR(50) NOT NULL,
+    "profile_image_url" VARCHAR(255), -- << 추가 완료!
+    "role" VARCHAR(10) NOT NULL DEFAULT 'user' CHECK("role" IN ('admin', 'user')),
+    "created_at" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Categories Table: 카테고리 정보

@@ -56,6 +56,7 @@ export type GetArchiveResponseDto = CommonResponseDto<GetArchiveResultType>;
 interface Author {
   id: number;
   nickname: string;
+  profileImageUrl: string;
 }
 
 // 태그 정보 타입

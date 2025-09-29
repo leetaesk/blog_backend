@@ -129,6 +129,7 @@ export const getPostById = async ({
         to_char(p.updated_at, 'YYYY-MM-DD HH24:MI:SS') AS "updatedAt",
         u.id AS "authorId",
         u.nickname AS "authorNickname",
+         u.profile_image_url AS "authorProfileImageUrl", -- ✨ 1. 작성자 프로필 이미지 URL 조회 추가
         c.id AS "categoryId",
         c.name AS "categoryName",
         (SELECT COUNT(*) FROM comments WHERE post_id = p.id) AS "commentCount"
@@ -168,6 +169,7 @@ export const getPostById = async ({
       author: {
         id: postRow.authorId,
         nickname: postRow.authorNickname,
+        profileImageUrl: postRow.authorProfileImageUrl, // ✨ 2. author 객체에 프로필 이미지 URL 추가
       },
       category: postRow.categoryId
         ? { id: postRow.categoryId, name: postRow.categoryName }
