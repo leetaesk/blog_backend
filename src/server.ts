@@ -3,6 +3,7 @@ import cors from "cors";
 import { query } from "./db"; // db 모듈에서 query 함수를 가져옵니다.
 import postsRouter from "./posts/posts.route"; // posts 라우터를 import 합니다.
 import categoriesRouter from "./categories/categories.route";
+import authRouter from "./auth/auth.route";
 
 const app = express();
 const port = 3000;
@@ -36,6 +37,7 @@ app.get("/", (req, res) => {
 // api 등록
 app.use("/api/posts", postsRouter);
 app.use("/api/categories", categoriesRouter);
+app.use("/api/auth", authRouter);
 
 // DB 연결 테스트를 위한 즉시 실행 함수 (유지)
 (async () => {
