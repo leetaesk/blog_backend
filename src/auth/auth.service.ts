@@ -1,3 +1,4 @@
+import { Response } from "express";
 import axios from "axios";
 import * as jwt from "jsonwebtoken";
 import { query } from "../db";
@@ -25,7 +26,8 @@ const {
 //  카카오 로그인 서비스
 // ============================
 export const kakaoLogin = async (
-  body: KakaoLoginRequestDto
+  body: KakaoLoginRequestDto,
+  res: Response // ⭐️ Express의 Response 객체를 인자로 추가
 ): Promise<KakaoLoginResponseDto> => {
   if (
     !KAKAO_REST_API_KEY ||
@@ -56,7 +58,6 @@ export const kakaoLogin = async (
     }
   );
 
-  // ✨ 1-1. 발급받은 카카오 액세스 토큰을 변수에 저장합니다.
   const kakaoAccessToken = tokenResponse.data.access_token;
 
   // 2. 발급받은 액세스 토큰으로 사용자 정보를 요청합니다.
@@ -76,7 +77,6 @@ export const kakaoLogin = async (
   let user = findUserResult.rows[0];
 
   if (!user) {
-    // ✨ 3-1. 신규 유저 생성 시, 카카오 액세스 토큰도 함께 저장합니다.
     const insertUserQuery = `
       INSERT INTO "users" (kakao_id, nickname, profile_image_url, kakao_access_token)
       VALUES ($1, $2, $3, $4) RETURNING *
@@ -89,7 +89,6 @@ export const kakaoLogin = async (
     ]);
     user = insertResult.rows[0];
   } else {
-    // ✨ 3-2. 기존 유저라면, 새로 발급받은 카카오 액세스 토큰으로 DB를 업데이트합니다.
     const updateUserTokenQuery =
       'UPDATE "users" SET "kakao_access_token" = $1 WHERE "id" = $2';
     await query(updateUserTokenQuery, [kakaoAccessToken, user.id]);
@@ -102,12 +101,22 @@ export const kakaoLogin = async (
     expiresIn: "14d",
   });
 
-  // 5. 클라이언트에 전달할 최종 응답 데이터를 구성합니다.
+  // ⭐️ 5. refreshToken을 httpOnly 쿠키에 담아 응답 헤더에 설정합니다.
+  res.cookie("refreshToken", refreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge: 14 * 24 * 60 * 60 * 1000, // 14일
+  });
+
+  // 6. 클라이언트에 전달할 최종 응답 데이터를 구성합니다.
   const result: KakaoLoginResultType = {
     accessToken,
-    refreshToken,
+    // refreshToken은 더 이상 본문에 포함하지 않습니다.
     userId: user.id,
     userRole: user.role,
+    userNickname: user.nickname,
+    userProfileImageUrl: user.profile_image_url,
   };
   const response: KakaoLoginResponseDto = {
     isSuccess: true,
@@ -123,15 +132,10 @@ export const kakaoLogin = async (
 //  카카오 로그아웃 서비스
 // ============================
 export const kakaoLogout = async (
-  ourAccessToken: string // ✨ 이제 이 토큰은 '우리 서비스의 JWT'입니다.
+  userId: number, // ⭐️ 인증 미들웨어를 통해 얻은 userId를 직접 받음
+  res: Response // ⭐️ 쿠키 삭제를 위해 Response 객체를 인자로 추가
 ): Promise<LogoutResponseDto> => {
-  if (!JWT_SECRET) throw new Error("JWT_SECRET is not defined.");
-
-  // ✨ 1. 우리 서비스의 JWT를 해독하여 어떤 유저인지 확인합니다 (userId).
-  const decoded = jwt.verify(ourAccessToken, JWT_SECRET) as { userId: number };
-  const { userId } = decoded;
-
-  // ✨ 2. userId로 DB에서 유저를 찾아 저장된 '카카오 액세스 토큰'을 가져옵니다.
+  // 1. userId로 DB에서 유저를 찾아 저장된 '카카오 액세스 토큰'을 가져옵니다.
   const findUserQuery = 'SELECT kakao_access_token FROM "users" WHERE id = $1';
   const userResult = await query(findUserQuery, [userId]);
 
@@ -143,33 +147,34 @@ export const kakaoLogout = async (
 
   const kakaoAccessToken = userResult.rows[0].kakao_access_token;
 
-  // 만약 토큰이 없다면 이미 로그아웃 처리된 것으로 간주하고 성공 응답을 보냅니다.
-  if (!kakaoAccessToken) {
-    return {
-      isSuccess: true,
-      code: "AUTH_003",
-      message: "이미 로그아웃 처리된 사용자입니다.",
-      result: { message: "Already logged out or no token found." },
-    };
+  // 2. DB에 카카오 토큰이 있는 경우에만 카카오 로그아웃을 진행합니다.
+  if (kakaoAccessToken) {
+    try {
+      // 2-1. 카카오 서버에 로그아웃을 요청합니다.
+      await axios.post<KakaoLogoutResponseDto>(
+        "https://kapi.kakao.com/v1/user/logout",
+        null,
+        { headers: { Authorization: `Bearer ${kakaoAccessToken}` } }
+      );
+
+      // 2-2. 성공 시, DB에 저장된 카카오 토큰을 비워줍니다.
+      const clearTokenQuery =
+        'UPDATE "users" SET kakao_access_token = NULL WHERE id = $1';
+      await query(clearTokenQuery, [userId]);
+    } catch (error) {
+      // 카카오 서버와의 통신 에러가 발생해도 우리 서비스 로그아웃은 계속 진행합니다.
+      console.error("🔥🔥🔥 ERROR in Kakao API logout:", error);
+    }
   }
 
-  // ✨ 3. DB에서 가져온 '카카오 액세스 토큰'으로 카카오에 로그아웃을 요청합니다.
-  await axios.post<KakaoLogoutResponseDto>(
-    "https://kapi.kakao.com/v1/user/logout",
-    null,
-    {
-      headers: {
-        Authorization: `Bearer ${kakaoAccessToken}`,
-      },
-    }
-  );
+  // ⭐️ 3. 우리 서비스의 refreshToken 쿠키를 삭제합니다.
+  res.clearCookie("refreshToken", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+  });
 
-  // ✨ 4. 로그아웃 성공 시, DB에 저장된 카카오 토큰을 비워줍니다 (재사용 방지).
-  const clearTokenQuery =
-    'UPDATE "users" SET kakao_access_token = NULL WHERE id = $1';
-  await query(clearTokenQuery, [userId]);
-
-  // 5. 최종 성공 응답을 구성하여 반환합니다.
+  // 4. 최종 성공 응답을 구성하여 반환합니다.
   const result: LogoutResultType = {
     message: `User (ID: ${userId}) has been successfully logged out.`,
   };

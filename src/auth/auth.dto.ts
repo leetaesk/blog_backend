@@ -21,9 +21,11 @@ export type User = "user" | "admin";
 
 export interface KakaoLoginResultType {
   accessToken: string;
-  refreshToken: string;
+  // refreshToken: string; => 쿠키에 저장
   userId: number; // 우리 서비스의 고유 사용자 ID
   userRole: User;
+  userNickname: string;
+  userProfileImageUrl: string;
 }
 
 export type KakaoLoginResponseDto = CommonResponseDto<KakaoLoginResultType>;

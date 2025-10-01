@@ -12,7 +12,8 @@ export const handleKakaoLogin = async (
 ) => {
   try {
     const body: KakaoLoginRequestDto = req.body;
-    const responseDto = await authService.kakaoLogin(body);
+    // ⭐️ 변경점: 서비스 함수에 res 객체를 함께 전달합니다.
+    const responseDto = await authService.kakaoLogin(body, res);
     res.status(200).json(responseDto);
   } catch (error) {
     console.error("🔥🔥🔥 ERROR in handleKakaoLogin controller:", error);
@@ -29,28 +30,23 @@ export const handleKakaoLogout = async (
   next: NextFunction
 ) => {
   try {
-    // 1. 클라이언트 요청 헤더에서 'Authorization' 값을 추출합니다.
-    const authHeader = req.headers["authorization"];
+    // ⭐️ 변경점: 인증 미들웨어가 검증 후 req.user에 넣어준 userId를 사용합니다.
+    // 더 이상 컨트롤러에서 토큰을 직접 파싱하고 검증할 필요가 없습니다.
+    const userId = req.user?.userId;
 
-    // 2. 헤더가 없거나 'Bearer '로 시작하지 않으면 에러를 발생시킵니다.
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      const err = new Error(
-        "Authorization header with Bearer token is required."
-      );
-      (err as any).status = 401; // 401 Unauthorized
+    if (!userId) {
+      // 미들웨어를 통과했다면 이럴 일은 없지만, 안전을 위한 타입 가드
+      const err = new Error("인증 정보가 없습니다.");
+      (err as any).status = 401;
       throw err;
     }
 
-    // 3. 'Bearer ' 부분을 제외한 실제 토큰 값만 추출합니다.
-    const accessToken = authHeader.split(" ")[1];
+    // ⭐️ 변경점: 서비스 함수에 userId와 res 객체를 전달합니다.
+    const responseDto = await authService.kakaoLogout(userId, res);
 
-    // 4. Service 로직을 호출하여 로그아웃을 처리합니다.
-    const responseDto = await authService.kakaoLogout(accessToken);
-
-    // 5. 처리 결과를 클라이언트에 JSON 형태로 응답합니다.
     res.status(200).json(responseDto);
   } catch (error) {
     console.error("🔥🔥🔥 ERROR in handleKakaoLogout controller:", error);
-    next(error); // 중앙 에러 핸들링 미들웨어로 에러를 전달합니다.
+    next(error);
   }
 };
