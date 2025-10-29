@@ -4,6 +4,7 @@ import {
     getPostByIdController,
     postPostController,
 } from "./posts.controller";
+import { authMiddleware } from "../auth/auth.middleware";
 
 const router = Router();
 
@@ -13,7 +14,7 @@ router.get("/", getArchiveController);
 
 // POST /api/posts
 // 글 작성
-router.post("/", postPostController);
+router.post("/", authMiddleware, postPostController);
 
 // GET /api/posts/:postId
 // 글 상세 (/posts/:postID)

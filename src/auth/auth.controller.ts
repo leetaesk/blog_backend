@@ -64,7 +64,9 @@ export const handleReissueToken = async (
         const refreshToken = req.cookies.refreshToken;
 
         if (!refreshToken) {
-            const err = new Error("Refresh Token이 없습니다.");
+            const err = new Error(
+                `Refresh Token이 없습니다. 가져온 리프레시토큰 : ${refreshToken}`
+            );
             (err as any).status = 401; // Unauthorized
             throw err;
         }

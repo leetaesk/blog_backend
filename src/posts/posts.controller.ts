@@ -1,6 +1,10 @@
 import { Request, Response, NextFunction } from "express"; // ✨ NextFunction 추가
-import { getArchive, getPostById } from "./posts.service";
-import { GetArchiveRequestDto, GetPostByIdRequestDto } from "./posts.dto";
+import { getArchive, getPostById, postPost } from "./posts.service";
+import {
+    GetArchiveRequestDto,
+    GetPostByIdRequestDto,
+    PostPostRequestDto,
+} from "./posts.dto";
 
 export const getArchiveController = async (
     req: Request,
@@ -86,35 +90,23 @@ export const postPostController = async (
     next: NextFunction
 ) => {
     try {
-        const postId = parseInt(req.params.postId, 10);
+        const userId = req.user?.userId;
 
-        if (isNaN(postId)) {
-            return res.status(400).json({
-                isSuccess: false,
-                code: "BAD_REQUEST",
-                message: "Post ID must be a valid number.",
-            });
+        // authMiddleware를 통과했다면 user.id는 항상 존재하지만, 타입스크립트를 위한 안전장치
+        if (!userId) {
+            const err = new Error("인증 정보가 없습니다.");
+            (err as any).status = 401;
+            throw err;
         }
 
-        const requestDto: GetPostByIdRequestDto = { postId };
-        const result = await getPostById(requestDto);
+        const postDto: PostPostRequestDto = req.body;
+        const responseDto = await postPost(userId, postDto);
 
-        if (!result) {
-            return res.status(404).json({
-                isSuccess: false,
-                code: "NOT_FOUND",
-                message: "Post not found.",
-            });
-        }
-
-        return res.status(200).json({
-            isSuccess: true,
-            code: "SUCCESS",
-            message: "Post retrieved successfully.",
-            result,
-        });
+        // 💡 200 OK도 괜찮지만, 새로운 리소스가 성공적으로 생성되었을 때는
+        // '201 Created' 상태 코드를 사용하는 것이 RESTful API 디자인 원칙에 더 부합합니다.
+        res.status(201).json(responseDto);
     } catch (error) {
-        // ✨ 6. 에러를 중앙 핸들러로 전달
+        console.error("🔥🔥🔥 ERROR in handleCreatePost controller:", error);
         next(error);
     }
 };

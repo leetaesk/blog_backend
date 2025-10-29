@@ -101,7 +101,7 @@ export const kakaoLogin = async (
     const jwtPayload = { userId: user.id };
     const accessToken = jwt.sign(jwtPayload, JWT_SECRET, { expiresIn: "2h" });
     const refreshToken = jwt.sign(jwtPayload, JWT_REFRESH_SECRET, {
-        expiresIn: "14d",
+        expiresIn: "12h",
     });
 
     // ⭐️ 5. refreshToken을 httpOnly 쿠키에 담아 응답 헤더에 설정합니다.

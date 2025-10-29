@@ -3,12 +3,15 @@
 import { marked } from "marked";
 import createDOMPurify from "dompurify";
 import { JSDOM } from "jsdom";
-import { query } from "../db";
+import pool, { query } from "../db";
 import {
     GetArchiveRequestDto,
     GetArchiveResultType,
     GetPostByIdRequestDto,
     GetPostByIdResultType,
+    PostPostRequestDto,
+    PostPostResponseDto,
+    PostPostResultType,
 } from "./posts.dto";
 
 // DOMPurify는 브라우저 환경의 DOM API가 필요하므로, Node.js 환경에서는 jsdom으로 가상 DOM을 만들어줍니다.
@@ -204,5 +207,103 @@ export const getPostById = async ({
             error
         );
         throw error;
+    }
+};
+
+export const postPost = async (
+    userId: number,
+    dto: PostPostRequestDto
+): Promise<PostPostResponseDto> => {
+    // DB 커넥션 풀에서 클라이언트를 하나 가져옵니다.
+    const client = await pool.connect();
+
+    try {
+        // =======================================================
+        // 1. 트랜잭션 시작
+        // =======================================================
+        await client.query("BEGIN");
+
+        // =======================================================
+        // 2. 'posts' 테이블에 새 게시글 삽입
+        // =======================================================
+        const insertPostQuery = `
+            INSERT INTO "posts" (user_id, title, content, summary, category_id, thumbnail_url)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING id; -- ⭐️ 생성된 게시글의 id를 바로 반환받습니다.
+        `;
+        const postValues = [
+            userId,
+            dto.title,
+            dto.content,
+            dto.summary,
+            dto.categoryId,
+            dto.thumbnailUrl,
+        ];
+        const postResult = await client.query(insertPostQuery, postValues);
+        const postId = postResult.rows[0].id; // 새로 생성된 게시글의 ID
+
+        // =======================================================
+        // 3. 태그 처리 (요청에 tags가 있을 경우에만 실행)
+        // =======================================================
+        if (dto.tags && dto.tags.length > 0) {
+            for (const tagName of dto.tags) {
+                // 3-1. 'tags' 테이블에서 태그를 찾거나, 없으면 새로 삽입 (UPSERT)
+                const findOrInsertTagQuery = `
+                    WITH new_tag AS (
+                        INSERT INTO "tags" (name)
+                        VALUES ($1)
+                        ON CONFLICT (name) DO NOTHING
+                        RETURNING id
+                    )
+                    SELECT id FROM new_tag
+                    UNION ALL
+                    SELECT id FROM "tags" WHERE name = $1 AND NOT EXISTS (SELECT 1 FROM new_tag);
+                `;
+
+                const tagResult = await client.query(findOrInsertTagQuery, [
+                    tagName,
+                ]);
+                const tagId = tagResult.rows[0].id;
+
+                // 3-2. 'post_tags' 테이블에 게시글과 태그의 관계를 추가
+                const insertPostTagQuery = `
+                    INSERT INTO "post_tags" (post_id, tag_id)
+                    VALUES ($1, $2);
+                `;
+                await client.query(insertPostTagQuery, [postId, tagId]);
+            }
+        }
+
+        // =======================================================
+        // 4. 모든 쿼리가 성공하면 트랜잭션을 커밋
+        // =======================================================
+        await client.query("COMMIT");
+
+        // =======================================================
+        // 5. 클라이언트에 반환할 최종 응답 DTO 구성
+        // =======================================================
+        const result: PostPostResultType = {
+            postId,
+        };
+        const response: PostPostResponseDto = {
+            isSuccess: true,
+            code: "POSTS_001",
+            message: "게시글이 성공적으로 작성되었습니다.",
+            result,
+        };
+        return response;
+    } catch (error) {
+        // =======================================================
+        // ❗️에러 발생 시 모든 변경사항을 롤백
+        // =======================================================
+        await client.query("ROLLBACK");
+        console.error("🔥🔥🔥 ERROR in createPost service:", error);
+        // 에러를 상위로 전파하여 중앙 에러 핸들러에서 처리하도록 합니다.
+        throw error;
+    } finally {
+        // =======================================================
+        // ✅ 사용한 DB 클라이언트를 커넥션 풀에 반환
+        // =======================================================
+        client.release();
     }
 };

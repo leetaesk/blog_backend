@@ -45,10 +45,7 @@ app.use(
     ) => {
         // Axios 에러인 경우 상세 에러를 로그에 남깁니다.
         if (err.isAxiosError) {
-            console.error(
-                "🔥🔥🔥 Kakao API Error Details:",
-                err.response?.data
-            );
+            console.error("🔥🔥🔥 Axios Error Details:", err.response?.data);
         } else {
             console.error("🔥🔥🔥 Unhandled Error:", err.stack);
         }

@@ -2,6 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 // 수정된 컨트롤러 함수를 가져옵니다.
 import { handleUploadImage } from "./images.controller";
+import { authMiddleware } from "../auth/auth.middleware";
 
 const imagesRouter = Router();
 
@@ -18,6 +19,11 @@ const upload = multer({
 });
 
 // 클래스 인스턴스 대신 직접 함수를 연결합니다.
-imagesRouter.post("/", upload.single("image"), handleUploadImage);
+imagesRouter.post(
+    "/",
+    authMiddleware,
+    upload.single("image"),
+    handleUploadImage
+);
 
 export default imagesRouter;

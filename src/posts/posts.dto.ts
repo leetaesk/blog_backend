@@ -8,10 +8,6 @@ export interface Category {
     name: string;
 }
 
-/**
- * GET /api/posts - 요청 DTO (Query Parameters)
- * @description /archive 페이지 게시글 목록 조회 API의 요청 쿼리를 정의합니다.
- */
 export interface GetArchiveRequestDto {
     page: number;
     limit: number; // 한 페이지에 보여줄 게시글 수
@@ -28,11 +24,6 @@ interface ArchiveItem {
     thumbnailUrl: string | null; // DB에 NULL이 있을 수 있으므로 null 타입 추가
     commentCount: number;
 }
-
-/**
- * GET /api/posts - 응답의 `result` 필드 DTO
- * @description /archive 페이지 게시글 목록 조회 API 응답의 실제 데이터 부분을 정의합니다.
- */
 export interface GetArchiveResultType {
     posts: ArchiveItem[];
     pagination: {
@@ -44,31 +35,18 @@ export interface GetArchiveResultType {
     };
 }
 
-/**
- * GET /api/posts - 최종 응답 DTO
- * @description /archive 페이지 게시글 목록 조회 API의 최종 응답 형태를 정의합니다.
- */
 export type GetArchiveResponseDto = CommonResponseDto<GetArchiveResultType>;
 
-// ===== ✨ 게시글 상세 조회 API DTO 추가 ===== //
-
-// 작성자 정보 타입
 interface Author {
     id: number;
     nickname: string;
     profileImageUrl: string;
 }
 
-// 태그 정보 타입
 interface Tag {
     id: number;
     name: string;
 }
-
-/**
- * GET /api/posts/:postId - 응답의 `result` 필드 DTO
- * @description 게시글 상세 조회 API 응답의 실제 데이터 부분을 정의합니다.
- */
 
 export interface GetPostByIdRequestDto {
     postId: number;
@@ -87,10 +65,6 @@ export interface GetPostByIdResultType {
     commentCount: number;
 }
 
-/**
- * GET /api/posts/:postId - 최종 응답 DTO
- * @description 게시글 상세 조회 API의 최종 응답 형태를 정의합니다.
- */
 export type GetPostByIdResponseDto = CommonResponseDto<GetPostByIdResultType>;
 
 export interface PostPostRequestDto {
