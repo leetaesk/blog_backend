@@ -10,5 +10,6 @@ const router = Router();
 // authController.handleKakaoLogin 함수가 처리하도록 연결합니다.
 router.post("/kakao/login", authController.handleKakaoLogin);
 router.post("/kakao/logout", authMiddleware, authController.handleKakaoLogout);
+router.post("/reissue", authController.handleReissueToken);
 
 export default router;

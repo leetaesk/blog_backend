@@ -5,6 +5,7 @@ import postsRouter from "./posts/posts.route";
 import categoriesRouter from "./categories/categories.route";
 import authRouter from "./auth/auth.route";
 import imagesRouter from "./images/images.routes";
+import cookieParser from "cookie-parser";
 
 const app = express();
 const port = 3000;
@@ -25,15 +26,12 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.get("/", (req, res) => {
-    res.send("Hello, I am the TypeScript backend!");
-});
+app.use(cookieParser());
 
 // api 등록
 app.use("/api/posts", postsRouter);
 app.use("/api/categories", categoriesRouter);
 app.use("/api/auth", authRouter);
-// '/api/images' 경로로 들어오는 요청은 imagesRouter가 처리하도록 설정합니다.
 app.use("/api/images", imagesRouter);
 
 // ✨ ===== 중앙 에러 핸들링 미들웨어 추가 ===== ✨

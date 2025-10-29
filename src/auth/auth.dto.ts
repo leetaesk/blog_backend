@@ -10,7 +10,7 @@ import { CommonResponseDto } from "../types/common.types";
  * @description 클라이언트 -> 서버: 카카오 로그인을 위해 인가 코드를 보낼 때 사용
  */
 export interface KakaoLoginRequestDto {
-  code: string;
+    code: string;
 }
 
 export type User = "user" | "admin";
@@ -20,12 +20,12 @@ export type User = "user" | "admin";
  */
 
 export interface KakaoLoginResultType {
-  accessToken: string;
-  // refreshToken: string; => 쿠키에 저장
-  userId: number; // 우리 서비스의 고유 사용자 ID
-  userRole: User;
-  userNickname: string;
-  userProfileImageUrl: string;
+    accessToken: string;
+    // refreshToken: string; => 쿠키에 저장
+    userId: number; // 우리 서비스의 고유 사용자 ID
+    userRole: User;
+    userNickname: string;
+    userProfileImageUrl: string;
 }
 
 export type KakaoLoginResponseDto = CommonResponseDto<KakaoLoginResultType>;
@@ -35,7 +35,7 @@ export type KakaoLoginResponseDto = CommonResponseDto<KakaoLoginResultType>;
  * @description 서버 -> 클라이언트: 로그아웃 성공 시 응답
  */
 export interface LogoutResultType {
-  message: string;
+    message: string;
 }
 export type LogoutResponseDto = CommonResponseDto<LogoutResultType>;
 
@@ -49,21 +49,21 @@ export type LogoutResponseDto = CommonResponseDto<LogoutResultType>;
  */
 
 export interface KakaoTokenRequestDto {
-  grant_type: "authorization_code";
-  client_id: string;
-  redirect_uri: string;
-  code: string;
-  client_secret: string;
+    grant_type: "authorization_code";
+    client_id: string;
+    redirect_uri: string;
+    code: string;
+    client_secret: string;
 }
 
 export interface KakaoTokenResponseDto {
-  token_type: "bearer";
-  access_token: string;
-  expires_in: number;
-  refresh_token: string;
-  refresh_token_expires_in: number;
-  id_token?: string; // OpenID Connect 활성화 시 포함될 수 있음 => 지금은 안 쓰고 리팩 시 사용할 수도 있음
-  scope: string;
+    token_type: "bearer";
+    access_token: string;
+    expires_in: number;
+    refresh_token: string;
+    refresh_token_expires_in: number;
+    id_token?: string; // OpenID Connect 활성화 시 포함될 수 있음 => 지금은 안 쓰고 리팩 시 사용할 수도 있음
+    scope: string;
 }
 
 /**
@@ -71,24 +71,26 @@ export interface KakaoTokenResponseDto {
  */
 
 interface KakaoProfile {
-  nickname: string;
-  profile_image_url: string;
-  thumbnail_image_url: string;
+    nickname: string;
+    profile_image_url: string;
+    thumbnail_image_url: string;
 }
 
 /**
  * @description 우리 서버 -> 카카오: 사용자 정보 요청의 응답 DTO
  */
 export interface KakaoUserResponseDto {
-  id: number; // 카카오가 발급하는 고유 사용자 ID
-  connected_at: string; // ISO 8601 형식의 UTC 시간
-  properties: KakaoProfile;
+    id: number; // 카카오가 발급하는 고유 사용자 ID
+    connected_at: string; // ISO 8601 형식의 UTC 시간
+    properties: KakaoProfile;
 }
 
-// ✨ ===== 카카오 로그아웃 응답 DTO 추가 ===== ✨
-/**
- * @description 우리 서버 -> 카카오: 로그아웃 요청의 응답 DTO
- */
 export interface KakaoLogoutResponseDto {
-  id: number; // 로그아웃된 사용자의 회원번호
+    id: number; // 로그아웃된 사용자의 회원번호
 }
+
+export interface ReissueResultType {
+    accessToken: string;
+}
+
+export type ReissueResponseDto = CommonResponseDto<ReissueResultType>;
