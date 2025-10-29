@@ -71,8 +71,13 @@ export const kakaoLogin = async (
         }
     );
 
+    console.log(
+        "카카오 사용자 정보 응답:",
+        JSON.stringify(userResponse.data, null, 2)
+    );
+
     const { id: kakaoId, properties } = userResponse.data;
-    const { nickname, profile_image_url } = properties;
+    const { nickname, profile_image: profile_image_url } = properties;
 
     // 3. DB에서 유저를 찾거나, 없으면 새로 생성합니다.
     const findUserQuery = 'SELECT * FROM "users" WHERE "kakao_id" = $1';
@@ -92,9 +97,25 @@ export const kakaoLogin = async (
         ]);
         user = insertResult.rows[0];
     } else {
-        const updateUserTokenQuery =
-            'UPDATE "users" SET "kakao_access_token" = $1 WHERE "id" = $2';
-        await query(updateUserTokenQuery, [kakaoAccessToken, user.id]);
+        // 💡 [수정] 기존 유저 정보 업데이트
+        const updateUserQuery = `
+      UPDATE "users" 
+      SET 
+        "kakao_access_token" = $1, 
+        "nickname" = $2, 
+        "profile_image_url" = $3 
+      WHERE "id" = $4
+    `;
+        await query(updateUserQuery, [
+            kakaoAccessToken,
+            nickname,
+            profile_image_url, // 최신 프로필 URL로 덮어쓰기
+            user.id,
+        ]);
+
+        // 💡 [추가] 응답에 최신 정보를 반영하기 위해 user 객체도 갱신
+        user.nickname = nickname;
+        user.profile_image_url = profile_image_url;
     }
 
     // 4. 우리 서비스의 JWT 토큰을 생성합니다.

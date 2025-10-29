@@ -70,19 +70,28 @@ export interface KakaoTokenResponseDto {
  * @description 카카오 사용자 정보 객체 중 'properties' 필드
  */
 
-interface KakaoProfile {
-    nickname: string;
-    profile_image_url: string;
-    thumbnail_image_url: string;
-}
-
 /**
  * @description 우리 서버 -> 카카오: 사용자 정보 요청의 응답 DTO
  */
 export interface KakaoUserResponseDto {
     id: number; // 카카오가 발급하는 고유 사용자 ID
     connected_at: string; // ISO 8601 형식의 UTC 시간
-    properties: KakaoProfile;
+    properties: {
+        nickname: string;
+        profile_image: string;
+        thumbnail_image: string;
+    };
+    kakao_account: {
+        profile_nickname_needs_agreement: false;
+        profile_image_needs_agreement: false;
+        profile: {
+            nickname: string;
+            thumbnail_image_url: string;
+            profile_image_url: string;
+            is_default_image: boolean;
+            is_default_nickname: boolean;
+        };
+    };
 }
 
 export interface KakaoLogoutResponseDto {

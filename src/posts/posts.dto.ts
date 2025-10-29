@@ -70,9 +70,9 @@ export type GetPostByIdResponseDto = CommonResponseDto<GetPostByIdResultType>;
 export interface PostPostRequestDto {
     title: string;
     content: string;
-    categoryId?: number;
-    summary?: string;
-    thumbnailUrl?: string;
+    categoryId: number;
+    summary: string;
+    thumbnailUrl: string;
     tags?: string[];
 }
 
