@@ -5,13 +5,19 @@ import createDOMPurify from "dompurify";
 import { JSDOM } from "jsdom";
 import pool, { query } from "../db";
 import {
+    DeletePostRequestDto,
+    DeletePostResultType,
     GetArchiveRequestDto,
     GetArchiveResultType,
     GetPostByIdRequestDto,
     GetPostByIdResultType,
+    GetPostForEditRequestDto,
+    GetPostForEditResultType,
     PostPostRequestDto,
     PostPostResponseDto,
     PostPostResultType,
+    UpdatePostRequestDto,
+    UpdatePostResultType,
 } from "./posts.dto";
 
 // DOMPurify는 브라우저 환경의 DOM API가 필요하므로, Node.js 환경에서는 jsdom으로 가상 DOM을 만들어줍니다.
@@ -305,5 +311,165 @@ export const postPost = async (
         // ✅ 사용한 DB 클라이언트를 커넥션 풀에 반환
         // =======================================================
         client.release();
+    }
+};
+
+export const updatePost = async (
+    dto: UpdatePostRequestDto
+): Promise<UpdatePostResultType> => {
+    const { postId, ...updateData } = dto;
+    const client = await pool.connect();
+
+    try {
+        await client.query("BEGIN");
+
+        // 1. 업데이트할 필드와 값을 동적으로 구성
+        // 👇👇👇 여기를 수정했습니다! .filter()를 추가해서 'tags'를 제외합니다.
+        const updateFields = (
+            Object.keys(updateData) as (keyof typeof updateData)[]
+        ).filter((key) => key !== "tags");
+
+        // 만약 tags를 제외하고 업데이트할 필드가 없다면, 태그 처리 로직으로 바로 넘어갑니다.
+        if (updateFields.length > 0) {
+            const columnMapping: Record<string, string> = {
+                categoryId: "category_id",
+                thumbnailUrl: "thumbnail_url",
+            };
+
+            const setClauses = updateFields
+                .map((key, index) => {
+                    const dbColumn = columnMapping[key] || key;
+                    return `"${dbColumn}" = $${index + 1}`;
+                })
+                .join(", ");
+
+            // updateValues도 필터링된 updateFields 기준으로 생성해야 합니다.
+            const updateValues = updateFields.map((key) => updateData[key]);
+
+            // 2. posts 테이블 업데이트
+            const updatePostQuery = `
+                UPDATE "posts"
+                SET ${setClauses}, "updated_at" = CURRENT_TIMESTAMP
+                WHERE id = $${updateValues.length + 1}
+            `;
+            await client.query(updatePostQuery, [...updateValues, postId]);
+        }
+
+        // 3. 태그 처리 (요청에 tags 필드가 있는 경우에만 실행)
+        // 이 부분은 기존 로직 그대로 유지됩니다.
+        if (dto.tags !== undefined) {
+            // 3-1. 기존 태그 연결 모두 삭제
+            await client.query('DELETE FROM "post_tags" WHERE post_id = $1', [
+                postId,
+            ]);
+
+            // 3-2. 새로운 태그 추가
+            if (dto.tags.length > 0) {
+                for (const tagName of dto.tags) {
+                    const findOrInsertTagQuery = `
+                        WITH new_tag AS (
+                            INSERT INTO "tags" (name) VALUES ($1)
+                            ON CONFLICT (name) DO NOTHING RETURNING id
+                        )
+                        SELECT id FROM new_tag
+                        UNION ALL
+                        SELECT id FROM "tags" WHERE name = $1 AND NOT EXISTS (SELECT 1 FROM new_tag);
+                    `;
+                    const tagResult = await client.query(findOrInsertTagQuery, [
+                        tagName,
+                    ]);
+                    const tagId = tagResult.rows[0].id;
+
+                    const insertPostTagQuery = `
+                        INSERT INTO "post_tags" (post_id, tag_id) VALUES ($1, $2)
+                        ON CONFLICT (post_id, tag_id) DO NOTHING;
+                    `;
+                    await client.query(insertPostTagQuery, [postId, tagId]);
+                }
+            }
+        }
+
+        await client.query("COMMIT");
+        return { postId };
+    } catch (error) {
+        await client.query("ROLLBACK");
+        console.error(
+            `🔥🔥🔥 ERROR in updatePost service for postId ${postId}:`,
+            error
+        );
+        throw error;
+    } finally {
+        client.release();
+    }
+};
+
+export const deletePost = async (
+    dto: DeletePostRequestDto
+): Promise<DeletePostResultType> => {
+    const { postId } = dto;
+    try {
+        // ON DELETE CASCADE 제약 조건 덕분에 post_tags, comments도 함께 삭제됩니다.
+        const deleteQuery = 'DELETE FROM "posts" WHERE id = $1 RETURNING id';
+        const result = await query(deleteQuery, [postId]);
+
+        if (result.rowCount === 0) {
+            const err = new Error("Post not found.");
+            (err as any).status = 404;
+            throw err;
+        }
+
+        return { postId: result.rows[0].id };
+    } catch (error) {
+        console.error(
+            `🔥🔥🔥 ERROR in deletePost service for postId ${postId}:`,
+            error
+        );
+        throw error;
+    }
+};
+
+export const getPostForEdit = async ({
+    postId,
+}: GetPostForEditRequestDto): Promise<GetPostForEditResultType | null> => {
+    try {
+        // 1. posts 테이블에서 원본 데이터를 조회합니다.
+        const postQueryStr = `
+      SELECT title, content, summary, thumbnail_url AS "thumbnailUrl", category_id AS "categoryId"
+      FROM posts
+      WHERE id = $1
+    `;
+        const postResult = await query(postQueryStr, [postId]);
+
+        if (postResult.rows.length === 0) {
+            return null;
+        }
+        const postRow = postResult.rows[0];
+
+        // 2. 해당 게시글의 태그 '이름' 목록을 조회합니다.
+        const tagsQueryStr = `
+      SELECT t.name FROM tags t
+      JOIN post_tags pt ON t.id = pt.tag_id
+      WHERE pt.post_id = $1
+      ORDER BY t.name ASC
+    `;
+        const tagsResult = await query(tagsQueryStr, [postId]);
+        // ❗️ [{ name: 'react' }, { name: 'ts' }] -> ['react', 'ts']
+        const tags = tagsResult.rows.map((row) => row.name);
+
+        // 3. 원본 데이터와 태그 이름을 조합하여 반환합니다.
+        return {
+            title: postRow.title,
+            content: postRow.content, // ❗️ HTML 변환 없음
+            summary: postRow.summary,
+            thumbnailUrl: postRow.thumbnailUrl,
+            categoryId: postRow.categoryId,
+            tags: tags, // ❗️ string[]
+        };
+    } catch (error) {
+        console.error(
+            `🔥🔥🔥 ERROR in getPostForEdit service for postId ${postId}:`,
+            error
+        );
+        throw error;
     }
 };

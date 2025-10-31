@@ -1,11 +1,21 @@
 import { Request, Response, NextFunction } from "express"; // ✨ NextFunction 추가
-import { getArchive, getPostById, postPost } from "./posts.service";
 import {
+    deletePost,
+    getArchive,
+    getPostById,
+    getPostForEdit,
+    postPost,
+    updatePost,
+} from "./posts.service";
+import {
+    DeletePostRequestDto,
     GetArchiveRequestDto,
     GetPostByIdRequestDto,
+    GetPostForEditRequestDto,
     PostPostRequestDto,
+    UpdatePostRequestDto,
 } from "./posts.dto";
-import { createPostSchema } from "./posts.schema";
+import { createPostSchema, updatePostSchema } from "./posts.schema";
 import { ZodError } from "zod";
 
 export const getArchiveController = async (
@@ -121,6 +131,107 @@ export const postPostController = async (
             });
         }
         console.error("🔥🔥🔥 ERROR in handleCreatePost controller:", error);
+        next(error);
+    }
+};
+
+export const updatePostController = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+) => {
+    try {
+        // 1. 요청 파라미터와 바디 데이터 파싱
+        const postId = parseInt(req.params.postId, 10);
+        const updateData = updatePostSchema.parse(req.body);
+
+        // 2. DTO 구성
+        const dto: UpdatePostRequestDto = { postId, ...updateData };
+
+        // 3. 서비스 호출
+        const result = await updatePost(dto);
+
+        // 4. 성공 응답
+        return res.status(200).json({
+            isSuccess: true,
+            code: "SUCCESS",
+            message: "Post updated successfully.",
+            result,
+        });
+    } catch (error) {
+        if (error instanceof ZodError) {
+            return res.status(400).json({
+                isSuccess: false,
+                code: "BAD_REQUEST",
+                message: "Invalid input.",
+                errors: error.flatten().fieldErrors,
+            });
+        }
+        next(error);
+    }
+};
+
+export const deletePostController = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+) => {
+    try {
+        // 1. 요청 파라미터 파싱
+        const postId = parseInt(req.params.postId, 10);
+
+        // 2. DTO 구성
+        const dto: DeletePostRequestDto = { postId };
+
+        // 3. 서비스 호출
+        const result = await deletePost(dto);
+
+        // 4. 성공 응답
+        return res.status(200).json({
+            isSuccess: true,
+            code: "SUCCESS",
+            message: "Post deleted successfully.",
+            result,
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const getPostForEditController = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+) => {
+    try {
+        const postId = parseInt(req.params.postId, 10);
+
+        if (isNaN(postId)) {
+            return res.status(400).json({
+                isSuccess: false,
+                code: "BAD_REQUEST",
+                message: "Post ID must be a valid number.",
+            });
+        }
+
+        const requestDto: GetPostForEditRequestDto = { postId };
+        const result = await getPostForEdit(requestDto);
+
+        if (!result) {
+            return res.status(404).json({
+                isSuccess: false,
+                code: "NOT_FOUND",
+                message: "Post not found.",
+            });
+        }
+
+        return res.status(200).json({
+            isSuccess: true,
+            code: "SUCCESS",
+            message: "Post data for edit retrieved successfully.",
+            result,
+        });
+    } catch (error) {
         next(error);
     }
 };

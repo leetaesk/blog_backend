@@ -66,3 +66,5 @@ export const createPostSchema = z.object({
 });
 
 export type PostPostRequestDto = z.infer<typeof createPostSchema>;
+
+export const updatePostSchema = createPostSchema.partial();
