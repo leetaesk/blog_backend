@@ -11,6 +11,9 @@ import likesRouter from "./likes/likes.route";
 const app = express();
 const port = 3000;
 
+// 추후 개발 환경에서 maxAge 줄이기
+// const isProduction = process.env.NODE_ENV === "production";
+
 const allowedOrigins = ["http://localhost:5173"];
 const corsOptions = {
     origin: function (origin: any, callback: any) {
@@ -21,6 +24,9 @@ const corsOptions = {
         }
     },
     credentials: true,
+    optionsSuccessStatus: 200, // 일부 구형 브라우저 호환성을 위해
+    maxAge: 86400,
+    // maxAge: isProduction ? 86400 : 600, // 운영: 24시간, 개발: 10분
 };
 
 app.use(cors(corsOptions));
