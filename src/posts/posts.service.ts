@@ -92,6 +92,7 @@ export const getArchive = async (
           p.summary, 
           to_char(p.created_at, 'YYYY-MM-DD') AS "createdAt",
           p.thumbnail_url AS "thumbnailUrl",
+          p.likes_count AS "likesCount", -- ✨ 1. likes_count 조회 추가
           c.id AS "categoryId",
           c.name AS "categoryName",
           (SELECT COUNT(*) FROM comments WHERE post_id = p.id) AS "commentCount"
@@ -119,6 +120,7 @@ export const getArchive = async (
             createdAt: row.createdAt,
             thumbnailUrl: row.thumbnailUrl,
             commentCount: parseInt(row.commentCount, 10),
+            likesCount: parseInt(row.likesCount, 10), // ✨ 2. likesCount 매핑 추가
             category: {
                 id: row.categoryId,
                 name: row.categoryName,
@@ -141,55 +143,67 @@ export const getArchive = async (
     }
 };
 
-// ===== ✨ 게시글 상세 조회 서비스 수정 ===== //
+// ===== ✨ 게시글 상세 조회 서비스 수정 (LEFT JOIN 사용) ===== //
 export const getPostById = async ({
     postId,
+    currentUserId,
 }: GetPostByIdRequestDto): Promise<GetPostByIdResultType | null> => {
     try {
-        // 1. 게시글 기본 정보 조회 (작성자, 카테고리 정보 포함)
         const postQueryStr = `
       SELECT
         p.id, p.title, p.content, p.thumbnail_url AS "thumbnailUrl", p.views,
+        p.likes_count AS "likesCount",
         to_char(p.created_at, 'YYYY-MM-DD HH24:MI:SS') AS "createdAt",
         to_char(p.updated_at, 'YYYY-MM-DD HH24:MI:SS') AS "updatedAt",
         u.id AS "authorId",
         u.nickname AS "authorNickname",
-         u.profile_image_url AS "authorProfileImageUrl", -- ✨ 1. 작성자 프로필 이미지 URL 조회 추가
+        u.profile_image_url AS "authorProfileImageUrl",
         c.id AS "categoryId",
         c.name AS "categoryName",
-        (SELECT COUNT(*) FROM comments WHERE post_id = p.id) AS "commentCount"
+        (SELECT COUNT(*) FROM comments WHERE post_id = p.id) AS "commentCount",
+        
+        -- ✨ 1. (수정) l.user_id가 NULL이 아니면 true, NULL이면 false
+        l.user_id IS NOT NULL AS "isLikedByUser"
+        
       FROM posts p
       JOIN users u ON p.user_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
+      
+      -- ✨ 2. (추가) 현재 사용자의 좋아요 기록만 LEFT JOIN
+      -- ON 절에 user_id 조건을 넣는 것이 핵심입니다.
+      LEFT JOIN likes l ON l.post_id = p.id AND l.user_id = $2
+      
       WHERE p.id = $1
     `;
-        const postResult = await query(postQueryStr, [postId]);
+
+        // ✨ 3. 파라미터는 동일하게 [postId, currentUserId] 전달
+        const postResult = await query(postQueryStr, [postId, currentUserId]);
 
         if (postResult.rows.length === 0) {
             return null;
         }
         const postRow = postResult.rows[0];
 
-        // 2. 게시글 태그 목록 조회
+        // --- 이하 로직은 동일 ---
+
+        // 태그 목록 조회
         const tagsQueryStr = `
-      SELECT t.id, t.name FROM tags t
-      JOIN post_tags pt ON t.id = pt.tag_id
-      WHERE pt.post_id = $1
-      ORDER BY t.name ASC
-    `;
+          SELECT t.id, t.name FROM tags t
+          JOIN post_tags pt ON t.id = pt.tag_id
+          WHERE pt.post_id = $1
+          ORDER BY t.name ASC
+        `;
         const tagsResult = await query(tagsQueryStr, [postId]);
 
-        // ✨ 3. 최종 데이터 조립 전, 마크다운을 HTML로 비동기 변환합니다.
-        const rawHtml = await marked.parse(postRow.content || ""); // content가 null일 경우를 대비해 기본값 추가
-
-        // 2단계 (★★★ 중요 ★★★): XSS 공격 방지를 위해 HTML 소독(Sanitize)
+        // 마크다운 변환
+        const rawHtml = await marked.parse(postRow.content || "");
         const sanitizedHtml = DOMPurify.sanitize(rawHtml);
 
-        // 4. 최종 데이터 형태로 조립
+        // 최종 데이터 조립
         const result: GetPostByIdResultType = {
             id: postRow.id,
             title: postRow.title,
-            content: sanitizedHtml, // ✨ 소독된 안전한 HTML을 할당
+            content: sanitizedHtml,
             thumbnailUrl: postRow.thumbnailUrl,
             views: postRow.views,
             createdAt: postRow.createdAt,
@@ -197,13 +211,15 @@ export const getPostById = async ({
             author: {
                 id: postRow.authorId,
                 nickname: postRow.authorNickname,
-                profileImageUrl: postRow.authorProfileImageUrl, // ✨ 2. author 객체에 프로필 이미지 URL 추가
+                profileImageUrl: postRow.authorProfileImageUrl,
             },
             category: postRow.categoryId
                 ? { id: postRow.categoryId, name: postRow.categoryName }
                 : null,
             tags: tagsResult.rows,
             commentCount: parseInt(postRow.commentCount, 10),
+            likesCount: parseInt(postRow.likesCount, 10),
+            isLikedByUser: postRow.isLikedByUser, // boolean 타입으로 바로 들어옵니다.
         };
 
         return result;

@@ -49,6 +49,7 @@ interface ArchiveItem {
     category: Category;
     thumbnailUrl: string | null;
     commentCount: number;
+    likesCount: number; // ✨ (수정) 이 줄을 추가합니다.
 }
 export interface GetArchiveResultType {
     posts: ArchiveItem[];
@@ -67,6 +68,7 @@ export type GetArchiveResponseDto = CommonResponseDto<GetArchiveResultType>;
 // =============================================
 export interface GetPostByIdRequestDto {
     postId: number;
+    currentUserId: number | undefined;
 }
 
 export interface GetPostByIdResultType {
@@ -81,6 +83,8 @@ export interface GetPostByIdResultType {
     category: Category | null;
     tags: Tag[];
     commentCount: number;
+    likesCount: number; // ✨ (신규) likesCount 추가
+    isLikedByUser: boolean; // ✨ (신규) isLikedByUser 추가
 }
 export type GetPostByIdResponseDto = CommonResponseDto<GetPostByIdResultType>;
 

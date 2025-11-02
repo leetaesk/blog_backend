@@ -7,7 +7,7 @@ import {
     postPostController,
     updatePostController,
 } from "./posts.controller";
-import { authMiddleware } from "../auth/auth.middleware";
+import { attachUserMiddleware, authMiddleware } from "../auth/auth.middleware";
 import { isPostOwner } from "../auth/isOwner.middleware";
 
 const router = Router();
@@ -22,7 +22,7 @@ router.post("/", authMiddleware, postPostController);
 
 // GET /api/posts/:postId
 // 글 상세 (/posts/:postID)
-router.get("/:postId", getPostByIdController);
+router.get("/:postId", attachUserMiddleware, getPostByIdController);
 
 // 게시글 수정
 router.patch(

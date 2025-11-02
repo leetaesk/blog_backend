@@ -35,6 +35,8 @@ export const authMiddleware = (
         const decoded = jwt.verify(token, JWT_SECRET) as { userId: number };
         // 해독된 사용자 정보를 req.user에 저장하여 다음 미들웨어/컨트롤러에서 사용할 수 있게 합니다.
         req.user = { userId: decoded.userId };
+        console.log("authMiddleware에서 꺼낸 userId:", req.user.userId);
+
         next(); // 다음 로직으로 제어를 넘깁니다.
     } catch (error) {
         return res.status(401).json({ message: "유효하지 않은 토큰입니다." });
@@ -92,4 +94,47 @@ export const isAdminMiddleware = async (
         // 토큰이 만료되었거나, 변조된 경우
         return res.status(401).json({ message: "유효하지 않은 토큰입니다." });
     }
+};
+
+/**
+ * (신규) 선택적 인증 미들웨어
+ * - 토큰이 있으면 req.user에 사용자 정보를 첨부합니다.
+ * - 토큰이 없거나 유효하지 않아도, 에러를 반환하지 않고 다음 미들웨어로 넘어갑니다.
+ * (getPostById처럼 비로그인/로그인 상태 모두를 처리해야 하는 API에 사용)
+ */
+export const attachUserMiddleware = (
+    req: Request,
+    res: Response,
+    next: NextFunction
+) => {
+    // 1. JWT_SECRET 환경 변수 확인
+    if (!JWT_SECRET) {
+        // 이 경우는 서버 설정 오류이므로 요청을 중단시킵니다.
+        console.error("JWT_SECRET is not configured.");
+        return res.status(500).json({ message: "Server configuration error." });
+    }
+
+    // 2. 헤더에서 토큰 추출
+    const authHeader = req.headers["authorization"];
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        // 토큰이 없음 -> 그냥 통과
+        return next();
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    try {
+        // 3. 토큰 검증
+        const decoded = jwt.verify(token, JWT_SECRET) as { userId: number };
+        console.log("attchUserMiddleware에서 꺼낸 userId:", decoded.userId);
+
+        // 4. (성공 시) req.user에 정보 첨부
+        req.user = { userId: decoded.userId };
+    } catch (error) {
+        // 5. (실패 시) 토큰이 유효하지 않음 -> 그냥 통과 (에러 반환 X)
+        // (예: 만료된 토큰을 가진 사용자가 글을 보는 경우)
+    }
+
+    // 6. 다음 미들웨어로 제어 전달
+    next();
 };

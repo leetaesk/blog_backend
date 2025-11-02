@@ -22,6 +22,7 @@ CREATE TABLE "posts" (
   "summary" VARCHAR(255),
   "thumbnail_url" VARCHAR(255),
   "views" INTEGER NOT NULL DEFAULT 0,
+  "likes_count" INTEGER NOT NULL DEFAULT 0,
   "user_id" INTEGER NOT NULL,
   "category_id" INTEGER,
   "created_at" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -53,6 +54,16 @@ CREATE TABLE "comments" (
   "post_id" INTEGER NOT NULL,
   "created_at" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE,
+  FOREIGN KEY ("post_id") REFERENCES "posts" ("id") ON DELETE CASCADE
+);
+
+-- Likes Table: 사용자와 게시글의 '좋아요' 관계
+CREATE TABLE "likes" (
+  "user_id" INTEGER NOT NULL,
+  "post_id" INTEGER NOT NULL,
+  "created_at" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY ("user_id", "post_id"),
   FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE,
   FOREIGN KEY ("post_id") REFERENCES "posts" ("id") ON DELETE CASCADE
 );

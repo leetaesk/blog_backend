@@ -64,6 +64,9 @@ export const getPostByIdController = async (
 ) => {
     try {
         const postId = parseInt(req.params.postId, 10);
+        // ✨ 1. (수정) attachUserMiddleware가 넣어준 userId를 선택적으로 가져옴
+        const currentUserId = req.user?.userId;
+        console.log(currentUserId);
 
         if (isNaN(postId)) {
             return res.status(400).json({
@@ -73,7 +76,9 @@ export const getPostByIdController = async (
             });
         }
 
-        const requestDto: GetPostByIdRequestDto = { postId };
+        // ✨ 2. (수정) DTO에 currentUserId 포함
+        const requestDto: GetPostByIdRequestDto = { postId, currentUserId };
+        // ✨ 3. (수정) 서비스로 DTO 전달
         const result = await getPostById(requestDto);
 
         if (!result) {
