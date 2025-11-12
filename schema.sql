@@ -1,11 +1,26 @@
--- Users Table: 회원 정보
+-- Users Table: 회원 정보 (실제 DB 및 개선사항 반영)
 CREATE TABLE "users" (
     "id" SERIAL PRIMARY KEY,
+
+    -- (스크립트 의도 반영) 카카오 ID는 NOT NULL + UNIQUE 여야 함
     "kakao_id" VARCHAR(255) UNIQUE NOT NULL,
+
     "nickname" VARCHAR(50) NOT NULL,
+
+    -- (로직 변경) 사용자 '커스텀' 프로필 (NULL 허용)
     "profile_image_url" VARCHAR(255),
+
     "role" VARCHAR(10) NOT NULL DEFAULT 'user' CHECK("role" IN ('admin', 'user')),
-    "created_at" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    "created_at" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    -- (JSON 반영) auth.service.ts가 사용하는 카카오 토큰
+    "kakao_access_token" VARCHAR(255),
+
+    -- (JSON 반영) 실제 DB에 존재했던 'email' 컬럼
+    "email" VARCHAR(255),
+
+    -- (개선 사항) 카카오 '원본' 프로필 (덮어쓰기 문제 해결용)
+    "kakao_profile_url" VARCHAR(255)
 );
 
 -- Categories Table: 카테고리 정보

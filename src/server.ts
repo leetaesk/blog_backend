@@ -8,6 +8,7 @@ import imagesRouter from "./images/images.routes";
 import cookieParser from "cookie-parser";
 import likesRouter from "./likes/likes.route";
 import commentsRouter from "./comments/comments.route";
+import usersRouter from "./users/users.route";
 
 const app = express();
 const port = 3000;
@@ -43,6 +44,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/images", imagesRouter);
 app.use("/api/likes", likesRouter);
 app.use("/api/comments", commentsRouter);
+app.use("/api/users", usersRouter);
 
 // ✨ ===== 중앙 에러 핸들링 미들웨어 추가 ===== ✨
 // ❗ 모든 라우터 등록 후에, 그리고 서버 실행(listen) 전에 위치해야 합니다.

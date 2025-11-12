@@ -1,5 +1,6 @@
 import { CommonResponseDto } from "../types/common.types";
 
+// 반환타입
 export interface CategoryWithPostCount {
     id: number;
     name: string;

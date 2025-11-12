@@ -25,11 +25,11 @@ const {
 } = process.env;
 
 // ============================
-//  카카오 로그인 서비스
+//  카카오 로그인 서비스 (⭐️ 수정됨)
 // ============================
 export const kakaoLogin = async (
     body: KakaoLoginRequestDto,
-    res: Response // ⭐️ Express의 Response 객체를 인자로 추가
+    res: Response
 ): Promise<KakaoLoginResponseDto> => {
     if (
         !KAKAO_REST_API_KEY ||
@@ -43,7 +43,7 @@ export const kakaoLogin = async (
 
     const { code } = body;
 
-    // 1. 인가 코드로 카카오 서버에 토큰을 요청합니다.
+    // 1. 인가 코드로 카카오 서버에 토큰을 요청합니다. (동일)
     const tokenResponse = await axios.post<KakaoTokenResponseDto>(
         "https://kauth.kakao.com/oauth/token",
         {
@@ -63,7 +63,7 @@ export const kakaoLogin = async (
 
     const kakaoAccessToken = tokenResponse.data.access_token;
 
-    // 2. 발급받은 액세스 토큰으로 사용자 정보를 요청합니다.
+    // 2. 발급받은 액세스 토큰으로 사용자 정보를 요청합니다. (동일)
     const userResponse = await axios.get<KakaoUserResponseDto>(
         "https://kapi.kakao.com/v2/user/me",
         {
@@ -77,7 +77,10 @@ export const kakaoLogin = async (
     );
 
     const { id: kakaoId, properties } = userResponse.data;
-    const { nickname, profile_image: profile_image_url } = properties;
+
+    // ⭐️ [수정] 변수명을 명확하게 변경 (kakaoProfileUrlFromApi)
+    const { nickname } = properties;
+    const kakaoProfileUrlFromApi = properties.profile_image; // 카카오가 제공한 최신 프로필
 
     // 3. DB에서 유저를 찾거나, 없으면 새로 생성합니다.
     const findUserQuery = 'SELECT * FROM "users" WHERE "kakao_id" = $1';
@@ -85,47 +88,54 @@ export const kakaoLogin = async (
     let user = findUserResult.rows[0];
 
     if (!user) {
+        // ⭐️ [수정] 신규 유저: profile_image_url과 kakao_profile_url 모두 카카오 프로필로 설정
         const insertUserQuery = `
-      INSERT INTO "users" (kakao_id, nickname, profile_image_url, kakao_access_token)
-      VALUES ($1, $2, $3, $4) RETURNING *
+      INSERT INTO "users" (
+        kakao_id, 
+        nickname, 
+        profile_image_url,  -- 1. 사용자가 보는 프로필
+        kakao_access_token, 
+        kakao_profile_url   -- 2. 카카오 원본 프로필
+      )
+      VALUES ($1, $2, $3, $4, $5) RETURNING *
     `;
         const insertResult = await query(insertUserQuery, [
             kakaoId.toString(),
             nickname,
-            profile_image_url,
+            kakaoProfileUrlFromApi, // 1. profile_image_url 에 저장
             kakaoAccessToken,
+            kakaoProfileUrlFromApi, // 2. kakao_profile_url 에 저장
         ]);
         user = insertResult.rows[0];
     } else {
-        // 💡 [수정] 기존 유저 정보 업데이트
+        // ⭐️ [수정] 기존 유저: kakao_profile_url만 업데이트 (profile_image_url은 건드리지 않음)
         const updateUserQuery = `
       UPDATE "users" 
       SET 
         "kakao_access_token" = $1, 
-        "nickname" = $2, 
-        "profile_image_url" = $3 
-      WHERE "id" = $4
+        "kakao_profile_url" = $2  -- ⭐️ 카카오 원본 프로필만 최신화
+      WHERE "id" = $3
     `;
         await query(updateUserQuery, [
             kakaoAccessToken,
-            nickname,
-            profile_image_url, // 최신 프로필 URL로 덮어쓰기
+            kakaoProfileUrlFromApi, // ⭐️ 최신 카카오 프로필 URL
             user.id,
         ]);
 
-        // 💡 [추가] 응답에 최신 정보를 반영하기 위해 user 객체도 갱신
-        user.nickname = nickname;
-        user.profile_image_url = profile_image_url;
+        // ⭐️ [수정] 응답에 최신 닉네임을 반영하기 위해 user 객체 갱신
+        // (profile_image_url은 DB의 값을 유지해야 하므로 수정하지 않습니다.)
+        user.kakao_profile_url = kakaoProfileUrlFromApi;
+        // (user.profile_image_url = kakaoProfileUrlFromApi; <- 이 줄이 삭제됨)
     }
 
-    // 4. 우리 서비스의 JWT 토큰을 생성합니다.
+    // 4. 우리 서비스의 JWT 토큰을 생성합니다. (동일)
     const jwtPayload = { userId: user.id };
     const accessToken = jwt.sign(jwtPayload, JWT_SECRET, { expiresIn: "2h" });
     const refreshToken = jwt.sign(jwtPayload, JWT_REFRESH_SECRET, {
         expiresIn: "12h",
     });
 
-    // ⭐️ 5. refreshToken을 httpOnly 쿠키에 담아 응답 헤더에 설정합니다.
+    // 5. refreshToken을 httpOnly 쿠키에 담아 응답 헤더에 설정합니다. (동일)
     res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
@@ -133,14 +143,15 @@ export const kakaoLogin = async (
         maxAge: 14 * 24 * 60 * 60 * 1000, // 14일
     });
 
-    // 6. 클라이언트에 전달할 최종 응답 데이터를 구성합니다.
+    // 6. 클라이언트에 전달할 최종 응답 데이터를 구성합니다. (동일)
+    // ⭐️ user.profile_image_url은 DB에서 가져온 값 (사용자 커스텀 URL)이 됩니다.
     const result: KakaoLoginResultType = {
         accessToken,
-        // refreshToken은 더 이상 본문에 포함하지 않습니다.
         userId: user.id,
         userRole: user.role,
         userNickname: user.nickname,
         userProfileImageUrl: user.profile_image_url,
+        userKakaoProfileImageUrl: user.kakao_profile_url,
     };
     const response: KakaoLoginResponseDto = {
         isSuccess: true,

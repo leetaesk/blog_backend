@@ -26,6 +26,7 @@ export interface KakaoLoginResultType {
     userRole: User;
     userNickname: string;
     userProfileImageUrl: string;
+    userKakaoProfileImageUrl: string;
 }
 
 export type KakaoLoginResponseDto = CommonResponseDto<KakaoLoginResultType>;

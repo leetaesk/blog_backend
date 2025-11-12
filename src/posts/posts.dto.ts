@@ -70,7 +70,6 @@ export interface GetPostByIdRequestDto {
     postId: number;
     currentUserId: number | undefined;
 }
-
 export interface GetPostByIdResultType {
     id: number;
     title: string;
