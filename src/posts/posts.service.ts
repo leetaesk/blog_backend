@@ -7,6 +7,8 @@ import pool, { query } from "../db";
 import {
     DeletePostRequestDto,
     DeletePostResultType,
+    GetArchiveLikedByMeRequestDto,
+    GetArchiveLikedByMeResultType,
     GetArchiveRequestDto,
     GetArchiveResultType,
     GetPostByIdRequestDto,
@@ -139,6 +141,149 @@ export const getArchive = async (
         };
     } catch (error) {
         console.error("🔥🔥🔥 ERROR in getArchive service:", error);
+        throw error;
+    }
+};
+
+// ⭐️ =======================================================
+// ⭐️ "내가 좋아요한 글" 아카이브 조회 서비스 (수정)
+// ⭐️ =======================================================
+export const getArchiveLikedByMe = async (
+    queryParams: GetArchiveLikedByMeRequestDto
+): Promise<GetArchiveLikedByMeResultType> => {
+    try {
+        // 1. 파라미터 분해 (userId 포함)
+        const { page, category, search, userId } = queryParams;
+        const limit = queryParams.limit || POSTS_PER_PAGE;
+        const offset = (page - 1) * limit;
+
+        // 2. 필터 조건 및 파라미터 배열 생성
+        const filterConditions: string[] = [];
+        const filterParams: (string | number)[] = [];
+
+        // ⭐️ 2-1. (핵심) userId로 필터링
+        filterConditions.push(`l.user_id = $${filterParams.length + 1}`);
+        filterParams.push(userId);
+
+        // 2-2. (선택) 카테고리 필터링
+        if (category) {
+            filterConditions.push(`c.name = $${filterParams.length + 1}`);
+            filterParams.push(category);
+        }
+
+        // 2-3. (선택) 검색어 필터링
+        if (search) {
+            const searchTerm = `%${search}%`;
+            filterConditions.push(`p.title ILIKE $${filterParams.length + 1}`);
+            filterParams.push(searchTerm);
+        }
+
+        // 3. WHERE 절 생성
+        const whereClause = ` WHERE ${filterConditions.join(" AND ")}`;
+
+        // 4. JOIN 절 생성
+        const likesJoin = ' JOIN "likes" l ON p.id = l.post_id';
+        // ⭐️ (선택) 카테고리 필터가 있을 때만 categories JOIN
+        const categoryJoin = category
+            ? ' JOIN "categories" c ON p.category_id = c.id'
+            : "";
+
+        // 5. 총 개수 (Count) 쿼리 실행
+        // ❗️[수정] 템플릿 리터럴 내부의 보이지 않는 비표준 공백(U+00A0)을
+        // ❗️        표준 공백(U+0020)으로 모두 수정했습니다.
+        const countQueryStr = `
+            SELECT COUNT(*) 
+            FROM "posts" p 
+            ${likesJoin} 
+            ${categoryJoin} 
+            ${whereClause}
+        `;
+
+        console.log(
+            "[DEBUG] Executing Liked Count Query:",
+            countQueryStr,
+            filterParams
+        );
+        const countResult = await query(countQueryStr, filterParams);
+        const totalPostCount =
+            countResult.rows.length > 0
+                ? parseInt(countResult.rows[0].count, 10)
+                : 0;
+        const totalPage = Math.ceil(totalPostCount / limit);
+
+        // 6. (예외 처리) 요청된 페이지가 총 페이지 수보다 크면 빈 배열 반환
+        if (page > totalPage && totalPostCount > 0) {
+            return {
+                posts: [],
+                pagination: {
+                    totalPostCount,
+                    totalPage,
+                    currentPage: page,
+                    isFirstPage: false,
+                    isLastPage: true,
+                },
+            };
+        }
+
+        // 7. 본문 (Posts) 쿼리 실행
+        // ❗️[수정] 여기도 마찬가지로 비표준 공백을 모두 수정했습니다.
+        const postsQueryStr = `
+            SELECT 
+                p.id, 
+                p.title, 
+                p.summary, 
+                to_char(p.created_at, 'YYYY-MM-DD') AS "createdAt",
+                p.thumbnail_url AS "thumbnailUrl",
+                p.likes_count AS "likesCount",
+                c.id AS "categoryId",
+                c.name AS "categoryName",
+                (SELECT COUNT(*) FROM comments WHERE post_id = p.id) AS "commentCount"
+            FROM "posts" p
+            ${likesJoin} 
+            LEFT JOIN "categories" c ON p.category_id = c.id
+            ${whereClause}
+            ORDER BY p.created_at DESC
+            LIMIT $${filterParams.length + 1} 
+            OFFSET $${filterParams.length + 2}
+        `;
+
+        const postsParams = [...filterParams, limit, offset];
+
+        console.log(
+            "[DEBUG] Executing Liked Posts Query:",
+            postsQueryStr,
+            postsParams
+        );
+        const postsResult = await query(postsQueryStr, postsParams);
+
+        // 8. 결과 데이터 매핑
+        const posts = postsResult.rows.map((row) => ({
+            id: row.id,
+            title: row.title,
+            summary: row.summary,
+            createdAt: row.createdAt,
+            thumbnailUrl: row.thumbnailUrl,
+            commentCount: parseInt(row.commentCount, 10),
+            likesCount: parseInt(row.likesCount, 10),
+            category: {
+                id: row.categoryId,
+                name: row.categoryName,
+            },
+        }));
+
+        // 9. 최종 결과 반환
+        return {
+            posts,
+            pagination: {
+                totalPostCount,
+                totalPage,
+                currentPage: page,
+                isFirstPage: page === 1,
+                isLastPage: page === totalPage || totalPage === 0,
+            },
+        };
+    } catch (error) {
+        console.error("🔥🔥🔥 ERROR in getArchiveLikedByMe service:", error);
         throw error;
     }
 };

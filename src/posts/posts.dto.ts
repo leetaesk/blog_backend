@@ -64,6 +64,30 @@ export interface GetArchiveResultType {
 export type GetArchiveResponseDto = CommonResponseDto<GetArchiveResultType>;
 
 // =============================================
+// Posts Liked By Me (GET /posts/liked-by/me)
+// =============================================
+
+export interface GetArchiveLikedByMeRequestDto {
+    page: number;
+    limit: number;
+    userId: number; // ⭐️ 필수
+    category?: string; // ⭐️ 선택
+    search?: string; // ⭐️ 선택
+}
+export interface GetArchiveLikedByMeResultType {
+    posts: ArchiveItem[];
+    pagination: {
+        totalPostCount: number;
+        totalPage: number;
+        currentPage: number;
+        isFirstPage: boolean;
+        isLastPage: boolean;
+    };
+}
+export type GetArchiveLikedByMeResponseDto =
+    CommonResponseDto<GetArchiveLikedByMeResultType>;
+
+// =============================================
 // Post Detail (GET /posts/:postId)
 // =============================================
 export interface GetPostByIdRequestDto {

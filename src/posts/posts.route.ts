@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
     deletePostController,
     getArchiveController,
+    getArchiveLikedByMeController,
     getPostByIdController,
     getPostForEditController,
     postPostController,
@@ -15,6 +16,13 @@ const router = Router();
 // GET /api/posts
 // 모든 글 목록 (/archive 페이지)
 router.get("/", getArchiveController);
+
+// ⭐️ (신규) 좋아요한 글 목록
+router.get(
+    "/liked-by/me",
+    authMiddleware, // 1. 로그인 확인
+    getArchiveLikedByMeController
+);
 
 // POST /api/posts
 // 글 작성

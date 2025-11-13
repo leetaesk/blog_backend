@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express"; // ✨ NextFunction �
 import {
     deletePost,
     getArchive,
+    getArchiveLikedByMe,
     getPostById,
     getPostForEdit,
     postPost,
@@ -27,7 +28,7 @@ export const getArchiveController = async (
         // 1. 요청 쿼리 파라미터 파싱 및 타입 변환
         const query: GetArchiveRequestDto = {
             page: parseInt(req.query.page as string, 10) || 1,
-            limit: parseInt(req.query.limit as string, 10) || 10,
+            limit: parseInt(req.query.limit as string, 10) || 12,
             category: req.query.category as string | undefined,
             search: req.query.search as string | undefined,
         };
@@ -53,6 +54,60 @@ export const getArchiveController = async (
         });
     } catch (error) {
         // ✨ 5. 에러를 중앙 핸들러로 전달
+        next(error);
+    }
+};
+
+export const getArchiveLikedByMeController = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+) => {
+    try {
+        // 1. (⭐️ 수정) authMiddleware로부터 userId 가져오기
+        const userId = req.user?.userId;
+
+        // 2. (⭐️ 수정) userId 유효성 검사
+        if (!userId) {
+            const err = new Error("인증 정보가 없습니다.");
+            (err as any).status = 401; // Unauthorized
+            throw err;
+        }
+
+        // 3. 요청 쿼리 파라미터 파싱 (기존 로직 동일), 기본값 1, 12
+        const queryParams = {
+            page: parseInt(req.query.page as string, 10) || 1,
+            limit: parseInt(req.query.limit as string, 10) || 12,
+            category: req.query.category as string | undefined,
+            search: req.query.search as string | undefined,
+        };
+
+        // 4. 유효성 검사 (page는 1 이상, 기존 로직 동일)
+        if (queryParams.page < 1) {
+            return res.status(400).json({
+                isSuccess: false,
+                code: "BAD_REQUEST",
+                message: "Page must be a positive integer.",
+            });
+        }
+
+        // 5. (⭐️ 수정) 서비스에 넘길 DTO 구성 (userId 포함) // (참고: posts.dto.ts에 GetArchiveLikedByMeRequestDto 타입 정의가 필요합니다.)
+        const dto = {
+            ...queryParams,
+            userId: userId,
+        };
+
+        // 6. (⭐️ 수정) "좋아요" 목록을 가져오는 새로운 서비스 호출 // (참고: posts.service.ts에 getArchiveLikedByMe 함수 구현이 필요합니다.)
+        const result = await getArchiveLikedByMe(dto); // 7. 성공 응답
+
+        return res.status(200).json({
+            isSuccess: true,
+            code: "SUCCESS",
+            message: "Liked posts archive retrieved successfully.", // (메시지 수정)
+            result,
+        });
+    } catch (error) {
+        // 8. 에러를 중앙 핸들러로 전달
         next(error);
     }
 };
