@@ -4,6 +4,7 @@ import {
     handleCreateComments,
     handleDeleteComments,
     handleGetComments,
+    handleGetCommentsCreatedByMe,
     handleUpdateComments,
 } from "./comments.controller";
 import { isCommentOwner } from "../auth/isOwner.middleware";
@@ -11,6 +12,8 @@ import { isCommentOwner } from "../auth/isOwner.middleware";
 const commentsRouter = Router();
 
 commentsRouter.get("/:postId", attachUserMiddleware, handleGetComments);
+
+commentsRouter.get("/me", authMiddleware, handleGetCommentsCreatedByMe);
 
 commentsRouter.post("/", authMiddleware, handleCreateComments);
 

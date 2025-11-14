@@ -11,6 +11,7 @@ import {
     createComment,
     deleteComment,
     getComments,
+    getCommentsCreatedByMe,
     updateComment,
 } from "./comments.service";
 
@@ -47,6 +48,30 @@ export const handleGetComments = async (
             code: "SUCCESS",
             message: "댓글이 성공적으로 조회되었습니다.",
             result: result, // { comments: CommentByUser[], commentCount: number }
+        });
+    } catch (error) {
+        next(error); // 중앙 에러 핸들러로 전달
+    }
+};
+
+export const handleGetCommentsCreatedByMe = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+) => {
+    try {
+        // 1. 유저 ID (authMiddleware가 보장)
+        const userId = req.user!.userId;
+
+        // 2. 서비스 호출 (페이지네이션은 추후 추가)
+        const result = await getCommentsCreatedByMe(userId);
+
+        // 3. 응답 반환 (200 OK)
+        return res.status(200).json({
+            isSuccess: true,
+            code: "SUCCESS",
+            message: "내가 작성한 댓글이 성공적으로 조회되었습니다.",
+            result: result,
         });
     } catch (error) {
         next(error); // 중앙 에러 핸들러로 전달

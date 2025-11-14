@@ -9,6 +9,8 @@ import {
     updateCommentResultType,
     DeleteCommentServiceDto,
     deleteCommentResultType,
+    MyCommentResult,
+    getCommentsCreatedByMeResultType,
 } from "./comments.dto";
 
 /**
@@ -133,6 +135,75 @@ export const getComments = async (
     }
 };
 
+export const getCommentsCreatedByMe = async (
+    userId: number
+): Promise<getCommentsCreatedByMeResultType> => {
+    try {
+        const queryStr = `
+            SELECT
+                c.id,
+                c.content,
+                to_char(c.created_at, 'YYYY-MM-DD HH24:MI:SS') AS "createdAt",
+                to_char(c.updated_at, 'YYYY-MM-DD HH24:MI:SS') AS "updatedAt",
+                c.likes_count AS "likesCount",
+                c.parent_comment_id AS "parentCommentId",
+                
+                -- 원본 게시글 정보
+                p.id AS "postId",
+                p.title AS "postTitle",
+                p.thumbnail_url AS "postThumbnailUrl",
+                
+                -- '좋아요' 여부 (내가 내 댓글을)
+                (cl.user_id IS NOT NULL) AS "isLiked"
+
+            FROM comments c
+            
+            -- 댓글이 속한 게시글 정보 JOIN
+            JOIN posts p ON c.post_id = p.id
+            
+            -- '좋아요' 정보 LEFT JOIN (로그인한 유저 ID($1) 기준)
+            LEFT JOIN comments_likes cl ON cl.comment_id = c.id AND cl.user_id = $1
+            
+            WHERE c.user_id = $1 -- $1 = userId
+            
+            -- 최신순 정렬
+            ORDER BY c.created_at DESC;
+            
+            -- (추후) LIMIT $2 OFFSET $3 (페이지네이션)
+        `;
+
+        const result = await query(queryStr, [userId]);
+
+        // DTO 스펙에 맞게 매핑
+        const comments: MyCommentResult[] = result.rows.map(
+            (row): MyCommentResult => ({
+                id: row.id,
+                content: row.content,
+                createdAt: row.createdAt,
+                updatedAt: row.updatedAt,
+                likesCount: row.likesCount,
+                isLiked: row.isLiked,
+                parentCommentId: row.parentCommentId,
+                post: {
+                    id: row.postId,
+                    title: row.postTitle,
+                    thumbnailUrl: row.postThumbnailUrl,
+                },
+            })
+        );
+
+        return {
+            comments: comments,
+            commentCount: comments.length,
+        };
+    } catch (error) {
+        console.error(
+            `🔥🔥🔥 ERROR in getCommentsCreatedByMe service (userId: ${userId}):`,
+            error
+        );
+        throw error;
+    }
+};
 /**
  * (신규) 댓글 또는 답글을 생성합니다.
  * - 2레벨 계층(1차 댓글, 2차 답글)을 강제합니다.

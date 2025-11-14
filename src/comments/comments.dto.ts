@@ -35,6 +35,38 @@ export interface getCommentsResultType {
 
 export type getCommentsResponseDto = CommonResponseDto<getCommentsResultType>;
 
+/**
+ * '내가 쓴 댓글' 목록 조회의 개별 댓글 타입
+ * - CommentByUser와 달리 'replies'가 없고, 대신 'post' 정보가 포함됩니다.
+ */
+export interface MyCommentResult {
+    id: number;
+    content: string;
+    createdAt: string;
+    updatedAt: string;
+    likesCount: number;
+    isLiked: boolean; // 내가 내 댓글을 '좋아요' 했는지 여부
+    parentCommentId: number | null;
+
+    // 댓글이 달린 원본 게시글 정보
+    post: {
+        id: number;
+        title: string;
+        thumbnailUrl: string | null;
+    };
+}
+
+/**
+ * (수정) '내가 쓴 댓글' API의 최종 응답 DTO
+ */
+export interface getCommentsCreatedByMeResultType {
+    comments: MyCommentResult[]; // 👈 CommentByUser[] 대신 MyCommentResult[] 사용
+    commentCount: number;
+}
+
+export type getCommentsCreatedByMeResponseDto =
+    CommonResponseDto<getCommentsCreatedByMeResultType>;
+
 export interface createCommentRequestDto {
     postId: number;
     content: string;
