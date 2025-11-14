@@ -105,9 +105,8 @@ export const isPostOwner = isOwnerMiddleware({
     ownerColumn: "user_id",
 });
 
-// (향후 확장) 댓글 소유권 확인 미들웨어 인스턴스 생성
-// export const isCommentOwner = isOwnerMiddleware({
-//     tableName: "comments",
-//     paramName: "commentId",
-//     ownerColumn: "user_id",
-// });
+export const isCommentOwner = isOwnerMiddleware({
+    tableName: "comments",
+    paramName: "commentId",
+    ownerColumn: "user_id",
+});

@@ -3,11 +3,13 @@ import {
     GetCommentsServiceDto,
     getCommentsResultType,
     CommentByUser,
+    CreateCommentServiceDto,
+    createCommentResultType,
+    UpdateCommentServiceDto,
+    updateCommentResultType,
+    DeleteCommentServiceDto,
+    deleteCommentResultType,
 } from "./comments.dto";
-import { Author } from "../posts/posts.dto"; // (가정) Author DTO 위치
-
-// (수정) DTO에 정의된 'replise', 'repliseCount' 오타를 감안하여 그대로 사용합니다.
-// (삭제) createAt 관련 주석 삭제
 
 /**
  * 게시글 ID에 해당하는 모든 댓글을 계층 구조(1차 댓글 + 2차 답글)로 조회합니다.
@@ -62,7 +64,6 @@ export const getComments = async (
         // 2. JS에서 계층 구조 조립
         // 댓글 ID를 키로 하는 Map을 생성하여 효율적으로 부모/자식 관계를 매칭
 
-        // (수정) parentCommentId를 optional로 변경 (delete 연산자 사용을 위해)
         type CommentInternal = CommentByUser & {
             parentCommentId?: number | null;
         };
@@ -76,7 +77,7 @@ export const getComments = async (
                 id: row.id,
                 content: row.content,
                 userId: row.user_id, // DTO 스펙 기준
-                createdAt: row.createdAt, // (수정) createAt -> createdAt
+                createdAt: row.createdAt,
                 updatedAt: row.updatedAt,
                 likesCount: row.likesCount,
                 author: {
@@ -86,8 +87,8 @@ export const getComments = async (
                 },
                 isOwner: row.isOwner,
                 isLiked: row.isLiked,
-                replise: [], // (수정) replies -> replise (DTO 스펙 기준)
-                repliseCount: 0, // 답글 수 (DTO 스펙 기준, 오타 감안)
+                replies: [], // (수정) DTO 스펙에 맞게 'replies'로 수정
+                repliesCount: 0, // (수정) DTO 스펙에 맞게 'repliesCount'로 수정
                 parentCommentId: row.parentCommentId, // 조립을 위한 임시 필드
             };
             commentsMap.set(comment.id, comment);
@@ -101,7 +102,7 @@ export const getComments = async (
                 if (parent) {
                     // 부모의 'replies' 배열에 추가 (임시 필드 제거)
                     delete comment.parentCommentId;
-                    parent.replise.push(comment); // (수정) replies -> replise
+                    parent.replies.push(comment);
                 }
             } else {
                 // 이 댓글이 1차 댓글인 경우 (parentCommentId가 NULL)
@@ -111,9 +112,9 @@ export const getComments = async (
             }
         }
 
-        // 2-3. 3차 패스: 1차 댓글의 'repliseCount' 업데이트
+        // 2-3. 3차 패스: 1차 댓글의 'repliesCount' 업데이트
         for (const comment of topLevelComments) {
-            comment.repliseCount = comment.replise.length; // (수정) replies -> replise
+            comment.repliesCount = comment.replies.length;
         }
 
         // 3. 최종 DTO 반환
@@ -126,6 +127,190 @@ export const getComments = async (
     } catch (error) {
         console.error(
             `🔥🔥🔥 ERROR in getComments service for postId ${postId}:`,
+            error
+        );
+        throw error;
+    }
+};
+
+/**
+ * (신규) 댓글 또는 답글을 생성합니다.
+ * - 2레벨 계층(1차 댓글, 2차 답글)을 강제합니다.
+ */
+export const createComment = async (
+    serviceDto: CreateCommentServiceDto
+): Promise<createCommentResultType> => {
+    const { postId, content, userId, parentCommentId } = serviceDto;
+
+    try {
+        // (권장) 실제 게시글이 존재하는지 확인 (FK 제약조건으로도 가능하지만, 명시적 확인)
+        const postCheck = await query("SELECT id FROM posts WHERE id = $1", [
+            postId,
+        ]);
+        if (postCheck.rows.length === 0) {
+            throw new Error("POST_NOT_FOUND");
+        }
+
+        // 1. (Validation) 답글인 경우 (parentCommentId가 있는 경우)
+        if (parentCommentId) {
+            const parentCommentQuery = `
+                SELECT post_id, parent_comment_id
+                FROM comments
+                WHERE id = $1;
+            `;
+            const parentResult = await query(parentCommentQuery, [
+                parentCommentId,
+            ]);
+
+            // 1-1. 부모 댓글 존재 여부
+            if (parentResult.rows.length === 0) {
+                throw new Error("PARENT_COMMENT_NOT_FOUND");
+            }
+
+            const parentComment = parentResult.rows[0];
+
+            // 1-2. 부모 댓글이 같은 게시글에 속해있는지
+            if (parentComment.post_id !== postId) {
+                throw new Error("PARENT_COMMENT_WRONG_POST");
+            }
+
+            // 1-3. 부모 댓글이 1차 댓글인지 (2레벨 계층 강제)
+            if (parentComment.parent_comment_id !== null) {
+                throw new Error("CANNOT_REPLY_TO_A_REPLY");
+            }
+        }
+
+        // 2. 댓글 INSERT
+        const insertQuery = `
+            INSERT INTO comments (content, user_id, post_id, parent_comment_id)
+            VALUES ($1, $2, $3, $4)
+            RETURNING
+                id,
+                content,
+                user_id AS "userId",
+                to_char(created_at, 'YYYY-MM-DD HH24:MI:SS') AS "createdAt",
+                parent_comment_id AS "parentCommentId"; 
+                -- DTO 스펙에 맞게 number | null 반환
+        `;
+
+        const params = [content, userId, postId, parentCommentId]; // parentCommentId는 null일 수 있음
+
+        const result = await query(insertQuery, params);
+
+        const newComment: createCommentResultType = result.rows[0];
+
+        return newComment;
+    } catch (error) {
+        console.error(
+            `🔥🔥🔥 ERROR in createComment service (userId: ${userId}, postId: ${postId}):`,
+            error
+        );
+        // 컨트롤러에서 처리할 수 있도록 커스텀 에러는 그대로 throw
+        if (
+            error instanceof Error &&
+            [
+                "POST_NOT_FOUND",
+                "PARENT_COMMENT_NOT_FOUND",
+                "PARENT_COMMENT_WRONG_POST",
+                "CANNOT_REPLY_TO_A_REPLY",
+            ].includes(error.message)
+        ) {
+            throw error;
+        }
+        // 그 외 DB 오류 등
+        throw new Error("Failed to create comment in service");
+    }
+};
+
+/**
+ * (신규) 특정 댓글의 내용을 수정합니다.
+ * - `isOwnerMiddleware`를 통과했다고 가정합니다.
+ */
+export const updateComment = async (
+    serviceDto: UpdateCommentServiceDto
+): Promise<updateCommentResultType> => {
+    const { commentId, userId, content } = serviceDto;
+
+    try {
+        const updateQuery = `
+            UPDATE comments
+            SET 
+                content = $1,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE 
+                id = $2 
+                AND user_id = $3 -- (안전장치) 소유권 재확인
+            RETURNING
+                id,
+                content,
+                user_id AS "userId",
+                to_char(created_at, 'YYYY-MM-DD HH24:MI:SS') AS "createdAt",
+                to_char(updated_at, 'YYYY-MM-DD HH24:MI:SS') AS "updatedAt",
+                parent_comment_id AS "parentCommentId";
+        `;
+
+        const params = [content, commentId, userId];
+        const result = await query(updateQuery, params);
+
+        // isOwnerMiddleware가 이미 검증했지만, 쿼리 결과가 0이라면
+        // (예: 어드민이 삭제했거나, DB 상태가 이상한 경우) 방어
+        if (result.rows.length === 0) {
+            // 미들웨어에서 이미 404/403을 처리했어야 하므로, 이 상황은 서버 에러에 가까움
+            console.warn(
+                `⚠️ WARNING: updateComment service (commentId: ${commentId}, userId: ${userId}) did not find a row to update, even after middleware.`
+            );
+            // 컨트롤러가 404를 반환할 수 있도록 리소스 없음 에러를 발생시킬 수 있으나,
+            // 미들웨어를 통과했다면 500으로 처리하는 것이 맞을 수 있음
+            throw new Error("COMMENT_NOT_FOUND_OR_NO_PERMISSION");
+        }
+
+        const updatedComment: updateCommentResultType = result.rows[0];
+        return updatedComment;
+    } catch (error) {
+        console.error(
+            `🔥🔥🔥 ERROR in updateComment service (commentId: ${commentId}, userId: ${userId}):`,
+            error
+        );
+        throw error;
+    }
+};
+
+/**
+ * (신규) 특정 댓글을 삭제합니다.
+ * - `isOwnerMiddleware`를 통과했다고 가정합니다.
+ * - DB 스키마의 ON DELETE CASCADE에 의해 답글과 좋아요가 함께 삭제됩니다.
+ */
+export const deleteComment = async (
+    serviceDto: DeleteCommentServiceDto
+): Promise<deleteCommentResultType> => {
+    const { commentId, userId } = serviceDto;
+
+    try {
+        const deleteQuery = `
+            DELETE FROM comments
+            WHERE 
+                id = $1 
+                AND user_id = $2 -- (안전장치) 소유권 재확인
+            RETURNING
+                id;
+        `;
+
+        const params = [commentId, userId];
+        const result = await query(deleteQuery, params);
+
+        if (result.rows.length === 0) {
+            // update와 동일한 케이스
+            console.warn(
+                `⚠️ WARNING: deleteComment service (commentId: ${commentId}, userId: ${userId}) did not find a row to delete, even after middleware.`
+            );
+            throw new Error("COMMENT_NOT_FOUND_OR_NO_PERMISSION");
+        }
+
+        const deletedComment: deleteCommentResultType = result.rows[0];
+        return deletedComment;
+    } catch (error) {
+        console.error(
+            `🔥🔥🔥 ERROR in deleteComment service (commentId: ${commentId}, userId: ${userId}):`,
             error
         );
         throw error;
