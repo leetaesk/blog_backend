@@ -1,9 +1,17 @@
 import { Router } from "express";
 import { authMiddleware } from "../auth/auth.middleware";
-import { handleToggleLikes } from "./likes.controller";
+import {
+    handleCommentToggleLikes,
+    handleToggleLikes,
+} from "./likes.controller";
 
 const likesRouter = Router();
 
-likesRouter.post("/:postId", authMiddleware, handleToggleLikes);
+likesRouter.post("/post/:postId", authMiddleware, handleToggleLikes);
+likesRouter.post(
+    "/comment/:commentId",
+    authMiddleware,
+    handleCommentToggleLikes
+);
 
 export default likesRouter;
