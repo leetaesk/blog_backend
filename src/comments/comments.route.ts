@@ -11,9 +11,10 @@ import { isCommentOwner } from "../auth/isOwner.middleware";
 
 const commentsRouter = Router();
 
-commentsRouter.get("/:postId", attachUserMiddleware, handleGetComments);
-
+// 얘를 위에 둬야 me를 postId로 인식을 안한다... ㅈㄴ신기하네
 commentsRouter.get("/me", authMiddleware, handleGetCommentsCreatedByMe);
+
+commentsRouter.get("/:postId", attachUserMiddleware, handleGetComments);
 
 commentsRouter.post("/", authMiddleware, handleCreateComments);
 
