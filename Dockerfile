@@ -1,7 +1,7 @@
 # ------------------------------
 # 1단계: 빌드용 (Builder)
 # ------------------------------
-FROM node:18 AS builder
+FROM node:20 AS builder
 WORKDIR /app
 
 # 1. [중요] pnpm 설치 (기본 이미지엔 없어서 설치해야 함)
@@ -21,7 +21,7 @@ COPY . .
 RUN pnpm run build
 
 # 2단계: 실행용 (Runner) - 가볍게 만들기
-FROM node:18
+FROM node:20
 WORKDIR /app
 
 # 1. 여기도 pnpm 설치
