@@ -1,97 +1,479 @@
--- Users Table: 회원 정보 (실제 DB 및 개선사항 반영)
-CREATE TABLE "users" (
-    "id" SERIAL PRIMARY KEY,
+--
+-- PostgreSQL database dump
+--
 
-    -- (스크립트 의도 반영) 카카오 ID는 NOT NULL + UNIQUE 여야 함
-    "kakao_id" VARCHAR(255) UNIQUE NOT NULL,
 
-    "nickname" VARCHAR(50) NOT NULL,
+-- Dumped from database version 17.6 (Debian 17.6-1.pgdg13+1)
+-- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
 
-    -- (로직 변경) 사용자 '커스텀' 프로필 (NULL 허용)
-    "profile_image_url" VARCHAR(255),
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
 
-    "role" VARCHAR(10) NOT NULL DEFAULT 'user' CHECK("role" IN ('admin', 'user')),
-    "created_at" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+SET default_tablespace = '';
 
-    -- (JSON 반영) auth.service.ts가 사용하는 카카오 토큰
-    "kakao_access_token" VARCHAR(255),
+SET default_table_access_method = heap;
 
-    -- (JSON 반영) 실제 DB에 존재했던 'email' 컬럼
-    "email" VARCHAR(255),
+--
+-- Name: categories; Type: TABLE; Schema: public; Owner: postgres
+--
 
-    -- (개선 사항) 카카오 '원본' 프로필 (덮어쓰기 문제 해결용)
-    "kakao_profile_url" VARCHAR(255)
+CREATE TABLE public.categories (
+    id integer NOT NULL,
+    name character varying(50) NOT NULL
 );
 
--- Categories Table: 카테고리 정보
-CREATE TABLE "categories" (
-    "id" SERIAL PRIMARY KEY,
-    "name" VARCHAR(50) UNIQUE NOT NULL
+
+ALTER TABLE public.categories OWNER TO postgres;
+
+--
+-- Name: categories_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.categories_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.categories_id_seq OWNER TO postgres;
+
+--
+-- Name: categories_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.categories_id_seq OWNED BY public.categories.id;
+
+
+--
+-- Name: comments; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.comments (
+    id integer NOT NULL,
+    content text NOT NULL,
+    user_id integer NOT NULL,
+    post_id integer NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    parent_comment_id integer,
+    likes_count integer DEFAULT 0 NOT NULL
 );
 
--- Posts Table: 게시글 정보
-CREATE TABLE "posts" (
-    "id" SERIAL PRIMARY KEY,
-    "title" VARCHAR(255) NOT NULL,
-    "content" TEXT,
-    "summary" VARCHAR(255),
-    "thumbnail_url" VARCHAR(255),
-    "views" INTEGER NOT NULL DEFAULT 0,
-    "likes_count" INTEGER NOT NULL DEFAULT 0,
-    "user_id" INTEGER NOT NULL,
-    "category_id" INTEGER,
-    "created_at" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE,
-    FOREIGN KEY ("category_id") REFERENCES "categories" ("id") ON DELETE SET NULL
+
+ALTER TABLE public.comments OWNER TO postgres;
+
+--
+-- Name: comments_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.comments_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.comments_id_seq OWNER TO postgres;
+
+--
+-- Name: comments_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.comments_id_seq OWNED BY public.comments.id;
+
+
+--
+-- Name: comments_likes; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.comments_likes (
+    user_id integer NOT NULL,
+    comment_id integer NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
 );
 
--- Tags Table: 태그 정보
-CREATE TABLE "tags" (
-    "id" SERIAL PRIMARY KEY,
-    "name" VARCHAR(50) UNIQUE NOT NULL
+
+ALTER TABLE public.comments_likes OWNER TO postgres;
+
+--
+-- Name: likes; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.likes (
+    user_id integer NOT NULL,
+    post_id integer NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
 );
 
--- Post_Tags Junction Table: 게시글과 태그의 다대다 관계
-CREATE TABLE "post_tags" (
-    "post_id" INTEGER NOT NULL,
-    "tag_id" INTEGER NOT NULL,
-    PRIMARY KEY ("post_id", "tag_id"),
-    FOREIGN KEY ("post_id") REFERENCES "posts" ("id") ON DELETE CASCADE,
-    FOREIGN KEY ("tag_id") REFERENCES "tags" ("id") ON DELETE CASCADE
+
+ALTER TABLE public.likes OWNER TO postgres;
+
+--
+-- Name: post_tags; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.post_tags (
+    post_id integer NOT NULL,
+    tag_id integer NOT NULL
 );
 
--- Comments Table: 댓글 정보
-CREATE TABLE "comments" (
-    "id" SERIAL PRIMARY KEY,
-    "content" TEXT NOT NULL,
-    "user_id" INTEGER NOT NULL,
-    "post_id" INTEGER NOT NULL,
-    "parent_comment_id" INTEGER, -- << (변경) 답글 기능을 위한 컬럼 (1차 댓글은 NULL)
-    "likes_count" INTEGER NOT NULL DEFAULT 0, -- << (변경) 댓글 좋아요 수를 위한 컬럼
-    "created_at" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE,
-    FOREIGN KEY ("post_id") REFERENCES "posts" ("id") ON DELETE CASCADE,
-    FOREIGN KEY ("parent_comment_id") REFERENCES "comments" ("id") ON DELETE CASCADE -- << (변경) 답글 외래 키
+
+ALTER TABLE public.post_tags OWNER TO postgres;
+
+--
+-- Name: posts; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.posts (
+    id integer NOT NULL,
+    title character varying(255) NOT NULL,
+    content text,
+    summary character varying(255),
+    thumbnail_url character varying(255),
+    views integer DEFAULT 0 NOT NULL,
+    user_id integer NOT NULL,
+    category_id integer,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    likes_count integer DEFAULT 0 NOT NULL
 );
 
--- Likes Table: 사용자와 '게시글'의 좋아요 관계
-CREATE TABLE "likes" (
-    "user_id" INTEGER NOT NULL,
-    "post_id" INTEGER NOT NULL,
-    "created_at" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY ("user_id", "post_id"),
-    FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE,
-    FOREIGN KEY ("post_id") REFERENCES "posts" ("id") ON DELETE CASCADE
+
+ALTER TABLE public.posts OWNER TO postgres;
+
+--
+-- Name: posts_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.posts_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.posts_id_seq OWNER TO postgres;
+
+--
+-- Name: posts_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.posts_id_seq OWNED BY public.posts.id;
+
+
+--
+-- Name: tags; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.tags (
+    id integer NOT NULL,
+    name character varying(50) NOT NULL
 );
 
--- (추가) Comments_Likes Table: 사용자와 '댓글'의 좋아요 관계
-CREATE TABLE "comments_likes" (
-  "user_id" INTEGER NOT NULL,
-  "comment_id" INTEGER NOT NULL,
-  "created_at" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY ("user_id", "comment_id"),
-  FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE,
-  FOREIGN KEY ("comment_id") REFERENCES "comments" ("id") ON DELETE CASCADE
+
+ALTER TABLE public.tags OWNER TO postgres;
+
+--
+-- Name: tags_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.tags_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.tags_id_seq OWNER TO postgres;
+
+--
+-- Name: tags_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.tags_id_seq OWNED BY public.tags.id;
+
+
+--
+-- Name: users; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.users (
+    id integer NOT NULL,
+    email character varying(255),
+    nickname character varying(50) NOT NULL,
+    role character varying(10) DEFAULT 'user'::character varying NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    kakao_id character varying(255),
+    profile_image_url character varying(255),
+    kakao_access_token character varying(255),
+    kakao_profile_url character varying(255),
+    CONSTRAINT users_role_check CHECK (((role)::text = ANY ((ARRAY['admin'::character varying, 'user'::character varying])::text[])))
 );
+
+
+ALTER TABLE public.users OWNER TO postgres;
+
+--
+-- Name: users_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.users_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.users_id_seq OWNER TO postgres;
+
+--
+-- Name: users_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.users_id_seq OWNED BY public.users.id;
+
+
+--
+-- Name: categories id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.categories ALTER COLUMN id SET DEFAULT nextval('public.categories_id_seq'::regclass);
+
+
+--
+-- Name: comments id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.comments ALTER COLUMN id SET DEFAULT nextval('public.comments_id_seq'::regclass);
+
+
+--
+-- Name: posts id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.posts ALTER COLUMN id SET DEFAULT nextval('public.posts_id_seq'::regclass);
+
+
+--
+-- Name: tags id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.tags ALTER COLUMN id SET DEFAULT nextval('public.tags_id_seq'::regclass);
+
+
+--
+-- Name: users id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.users ALTER COLUMN id SET DEFAULT nextval('public.users_id_seq'::regclass);
+
+
+--
+-- Name: categories categories_name_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.categories
+    ADD CONSTRAINT categories_name_key UNIQUE (name);
+
+
+--
+-- Name: categories categories_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.categories
+    ADD CONSTRAINT categories_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: comments_likes comment_likes_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.comments_likes
+    ADD CONSTRAINT comment_likes_pkey PRIMARY KEY (user_id, comment_id);
+
+
+--
+-- Name: comments comments_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.comments
+    ADD CONSTRAINT comments_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: likes likes_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.likes
+    ADD CONSTRAINT likes_pkey PRIMARY KEY (user_id, post_id);
+
+
+--
+-- Name: post_tags post_tags_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.post_tags
+    ADD CONSTRAINT post_tags_pkey PRIMARY KEY (post_id, tag_id);
+
+
+--
+-- Name: posts posts_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.posts
+    ADD CONSTRAINT posts_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: tags tags_name_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.tags
+    ADD CONSTRAINT tags_name_key UNIQUE (name);
+
+
+--
+-- Name: tags tags_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.tags
+    ADD CONSTRAINT tags_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: users users_email_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_email_key UNIQUE (email);
+
+
+--
+-- Name: users users_kakao_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_kakao_id_key UNIQUE (kakao_id);
+
+
+--
+-- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: comments_likes comment_likes_comment_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.comments_likes
+    ADD CONSTRAINT comment_likes_comment_id_fkey FOREIGN KEY (comment_id) REFERENCES public.comments(id) ON DELETE CASCADE;
+
+
+--
+-- Name: comments_likes comment_likes_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.comments_likes
+    ADD CONSTRAINT comment_likes_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: comments comments_post_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.comments
+    ADD CONSTRAINT comments_post_id_fkey FOREIGN KEY (post_id) REFERENCES public.posts(id) ON DELETE CASCADE;
+
+
+--
+-- Name: comments comments_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.comments
+    ADD CONSTRAINT comments_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: comments fk_parent_comment; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.comments
+    ADD CONSTRAINT fk_parent_comment FOREIGN KEY (parent_comment_id) REFERENCES public.comments(id) ON DELETE CASCADE;
+
+
+--
+-- Name: likes likes_post_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.likes
+    ADD CONSTRAINT likes_post_id_fkey FOREIGN KEY (post_id) REFERENCES public.posts(id) ON DELETE CASCADE;
+
+
+--
+-- Name: likes likes_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.likes
+    ADD CONSTRAINT likes_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: post_tags post_tags_post_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.post_tags
+    ADD CONSTRAINT post_tags_post_id_fkey FOREIGN KEY (post_id) REFERENCES public.posts(id) ON DELETE CASCADE;
+
+
+--
+-- Name: post_tags post_tags_tag_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.post_tags
+    ADD CONSTRAINT post_tags_tag_id_fkey FOREIGN KEY (tag_id) REFERENCES public.tags(id) ON DELETE CASCADE;
+
+
+--
+-- Name: posts posts_category_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.posts
+    ADD CONSTRAINT posts_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.categories(id) ON DELETE SET NULL;
+
+
+--
+-- Name: posts posts_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.posts
+    ADD CONSTRAINT posts_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- PostgreSQL database dump complete
+--
+
+
