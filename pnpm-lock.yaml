@@ -11,18 +11,6 @@ importers:
       '@aws-sdk/client-s3':
         specifier: ^3.918.0
         version: 3.918.0
-      '@types/cookie-parser':
-        specifier: ^1.4.10
-        version: 1.4.10(@types/express@5.0.3)
-      '@types/cors':
-        specifier: ^2.8.19
-        version: 2.8.19
-      '@types/express':
-        specifier: ^5.0.3
-        version: 5.0.3
-      '@types/node':
-        specifier: ^24.3.1
-        version: 24.3.1
       axios:
         specifier: ^1.12.2
         version: 1.12.2
@@ -53,18 +41,9 @@ importers:
       multer:
         specifier: ^2.0.2
         version: 2.0.2
-      nodemon:
-        specifier: ^3.1.10
-        version: 3.1.10
       pg:
         specifier: ^8.16.3
         version: 8.16.3
-      ts-node:
-        specifier: ^10.9.2
-        version: 10.9.2(@types/node@24.3.1)(typescript@5.9.2)
-      typescript:
-        specifier: ^5.9.2
-        version: 5.9.2
       uuid:
         specifier: ^13.0.0
         version: 13.0.0
@@ -72,6 +51,15 @@ importers:
         specifier: ^4.1.12
         version: 4.1.12
     devDependencies:
+      '@types/cookie-parser':
+        specifier: ^1.4.10
+        version: 1.4.10(@types/express@5.0.3)
+      '@types/cors':
+        specifier: ^2.8.19
+        version: 2.8.19
+      '@types/express':
+        specifier: ^5.0.3
+        version: 5.0.3
       '@types/jsdom':
         specifier: ^27.0.0
         version: 27.0.0
@@ -81,9 +69,21 @@ importers:
       '@types/multer':
         specifier: ^2.0.0
         version: 2.0.0
+      '@types/node':
+        specifier: ^24.3.1
+        version: 24.3.1
       '@types/pg':
         specifier: ^8.15.5
         version: 8.15.5
+      nodemon:
+        specifier: ^3.1.10
+        version: 3.1.10
+      ts-node:
+        specifier: ^10.9.2
+        version: 10.9.2(@types/node@24.3.1)(typescript@5.9.2)
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.2
 
 packages:
 

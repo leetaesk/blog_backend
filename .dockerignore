@@ -1,0 +1,24 @@
+# 1. 의존성 폴더 (도커 안에서 새로 설치할 거니까 로컬 거는 뺌)
+node_modules
+
+# 2. 빌드 결과물 (도커 안에서 새로 빌드할 거니까 뺌)
+dist
+
+# 3. 환경변수/비밀키 (절대 이미지에 박제되면 안 됨! 🚨 제일 중요)
+.env
+.env.*
+
+# 4. 깃 및 에디터 설정 (실행이랑 관련 없음)
+.git
+.vscode
+.idea
+
+# 5. 로그 파일 및 찌꺼기
+npm-debug.log*
+yarn-error.log
+pnpm-debug.log*
+*.log
+
+# 6. OS 시스템 파일 (맥/윈도우 찌꺼기)
+.DS_Store
+Thumbs.db
