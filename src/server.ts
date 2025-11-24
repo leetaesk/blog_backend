@@ -19,7 +19,7 @@ const port = 3000;
 const allowedOrigins = [
     "http://localhost:5173",
     "https://blog-frontend-delta-five.vercel.app",
-    "https://leetaesk.com",
+    "https://www.leetaesk.com",
 ];
 const corsOptions = {
     origin: function (origin: any, callback: any) {
