@@ -16,7 +16,11 @@ const port = 3000;
 // 추후 개발 환경에서 maxAge 줄이기
 // const isProduction = process.env.NODE_ENV === "production";
 
-const allowedOrigins = ["http://localhost:5173"];
+const allowedOrigins = [
+    "http://localhost:5173",
+    "https://blog-frontend-delta-five.vercel.app",
+    "https://leetaesk.com",
+];
 const corsOptions = {
     origin: function (origin: any, callback: any) {
         if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
