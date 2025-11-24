@@ -41,7 +41,7 @@ export const kakaoLogin = async (
         throw new Error("환경 변수가 제대로 설정되지 않았습니다.");
     }
 
-    const { code } = body;
+    const { code, redirectURI } = body;
 
     // 1. 인가 코드로 카카오 서버에 토큰을 요청합니다. (동일)
     const tokenResponse = await axios.post<KakaoTokenResponseDto>(
@@ -49,7 +49,7 @@ export const kakaoLogin = async (
         {
             grant_type: "authorization_code",
             client_id: KAKAO_REST_API_KEY,
-            redirect_uri: KAKAO_REDIRECT_URI,
+            redirect_uri: redirectURI,
             code,
             client_secret: KAKAO_CLIENT_SECRET,
         },
