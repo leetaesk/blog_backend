@@ -138,9 +138,11 @@ export const kakaoLogin = async (
     // 5. refreshToken을 httpOnly 쿠키에 담아 응답 헤더에 설정합니다. (동일)
     res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
+        // 배포 환경이면 true (HTTPS), 로컬이면 false (HTTP)
         secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        maxAge: 14 * 24 * 60 * 60 * 1000, // 14일
+        // 배포 환경이면 strict, 로컬이면 lax (포트가 달라도 허용)
+        sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+        maxAge: 14 * 24 * 60 * 60 * 1000,
     });
 
     // 6. 클라이언트에 전달할 최종 응답 데이터를 구성합니다. (동일)
