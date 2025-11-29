@@ -28,7 +28,6 @@ const {
 //  카카오 로그인 서비스 (⭐️ 수정됨)
 // ============================
 export const kakaoLogin = async (
-    req: Request,
     body: KakaoLoginRequestDto,
     res: Response
 ): Promise<KakaoLoginResponseDto> => {
