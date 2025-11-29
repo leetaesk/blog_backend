@@ -28,6 +28,7 @@ const {
 //  카카오 로그인 서비스 (⭐️ 수정됨)
 // ============================
 export const kakaoLogin = async (
+    req: Request,
     body: KakaoLoginRequestDto,
     res: Response
 ): Promise<KakaoLoginResponseDto> => {
@@ -136,12 +137,19 @@ export const kakaoLogin = async (
     });
 
     // 5. refreshToken을 httpOnly 쿠키에 담아 응답 헤더에 설정합니다. (동일)
+    // 1. 요청이 로컬(localhost)에서 왔는지 확인합니다.
+    // const origin = req.headers['origin'];
+    // origin이 존재하고, 'localhost' 문자열을 포함하고 있는지 체크
+    // const isLocalRequest = origin && origin.includes("localhost");
     res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
-        // 배포 환경이면 true (HTTPS), 로컬이면 false (HTTP)
-        secure: process.env.NODE_ENV === "production",
-        // 배포 환경이면 strict, 로컬이면 lax (포트가 달라도 허용)
-        sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+        // 배포된 서버는 HTTPS일 테니 true로 고정합니다.
+        // (크롬은 localhost에 한해 HTTPS가 아니어도 secure 쿠키를 허용해줍니다)
+        secure: true,
+
+        // [핵심] 로컬 요청이면 'none'으로 풀고, 실제 배포 환경이면 'strict'로 잠급니다.
+        // sameSite: isLocalRequest ? "none" : "strict",
+        sameSite: "none",
         maxAge: 14 * 24 * 60 * 60 * 1000,
     });
 
