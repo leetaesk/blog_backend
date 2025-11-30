@@ -21,6 +21,9 @@ import {
     UpdatePostRequestDto,
     UpdatePostResultType,
 } from "./posts.dto";
+import { Marked } from "marked";
+import { markedHighlight } from "marked-highlight";
+import hljs from "highlight.js";
 
 // DOMPurify는 브라우저 환경의 DOM API가 필요하므로, Node.js 환경에서는 jsdom으로 가상 DOM을 만들어줍니다.
 const window = new JSDOM("").window;
@@ -289,6 +292,8 @@ export const getArchiveLikedByMe = async (
 };
 
 // ===== ✨ 게시글 상세 조회 서비스 수정 (LEFT JOIN 사용) ===== //
+
+// ===== ✨ 게시글 상세 조회 서비스 수정 (highlight.js 적용) ===== //
 export const getPostById = async ({
     postId,
     currentUserId,
@@ -306,30 +311,20 @@ export const getPostById = async ({
         c.id AS "categoryId",
         c.name AS "categoryName",
         (SELECT COUNT(*) FROM comments WHERE post_id = p.id) AS "commentCount",
-        
-        -- ✨ 1. (수정) l.user_id가 NULL이 아니면 true, NULL이면 false
         l.user_id IS NOT NULL AS "isLikedByUser"
-        
       FROM posts p
       JOIN users u ON p.user_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
-      
-      -- ✨ 2. (추가) 현재 사용자의 좋아요 기록만 LEFT JOIN
-      -- ON 절에 user_id 조건을 넣는 것이 핵심입니다.
       LEFT JOIN likes l ON l.post_id = p.id AND l.user_id = $2
-      
       WHERE p.id = $1
     `;
 
-        // ✨ 3. 파라미터는 동일하게 [postId, currentUserId] 전달
         const postResult = await query(postQueryStr, [postId, currentUserId]);
 
         if (postResult.rows.length === 0) {
             return null;
         }
         const postRow = postResult.rows[0];
-
-        // --- 이하 로직은 동일 ---
 
         // 태그 목록 조회
         const tagsQueryStr = `
@@ -340,9 +335,29 @@ export const getPostById = async ({
         `;
         const tagsResult = await query(tagsQueryStr, [postId]);
 
-        // 마크다운 변환
-        const rawHtml = await marked.parse(postRow.content || "");
-        const sanitizedHtml = DOMPurify.sanitize(rawHtml);
+        // ⭐️ [변경] 1. Marked 인스턴스 생성 (highlight 설정 주입)
+        const marked = new Marked(
+            markedHighlight({
+                langPrefix: "hljs language-", // highlight.js CSS 클래스 규칙
+                highlight(code, lang) {
+                    // 언어가 지정되어 있고 highlight.js가 지원하는 언어라면 해당 언어로, 아니면 텍스트로 처리
+                    const language = hljs.getLanguage(lang)
+                        ? lang
+                        : "plaintext";
+                    return hljs.highlight(code, { language }).value;
+                },
+            })
+        );
+
+        // ⭐️ [변경] 2. 변환 실행 (await는 marked 설정에 따라 필요할 수도 있으니 유지)
+        const rawHtml = (await marked.parse(postRow.content || "")) as string;
+
+        // ⭐️ [변경] 3. DOMPurify 설정 변경 (중요!)
+        // 기본 설정은 class를 다 지워버리므로, highlight용 class와 태그를 허용해줘야 함
+        const sanitizedHtml = DOMPurify.sanitize(rawHtml, {
+            ADD_TAGS: ["span"], // highlight.js는 <span> 태그를 사용함
+            ADD_ATTR: ["class"], // class="hljs..." 속성을 허용함
+        });
 
         // 최종 데이터 조립
         const result: GetPostByIdResultType = {
@@ -364,7 +379,7 @@ export const getPostById = async ({
             tags: tagsResult.rows,
             commentCount: parseInt(postRow.commentCount, 10),
             likesCount: parseInt(postRow.likesCount, 10),
-            isLikedByUser: postRow.isLikedByUser, // boolean 타입으로 바로 들어옵니다.
+            isLikedByUser: postRow.isLikedByUser,
         };
 
         return result;
