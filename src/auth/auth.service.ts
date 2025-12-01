@@ -146,7 +146,7 @@ export const kakaoLogin = async (
     // const isLocalRequest = origin && origin.includes("localhost");
     res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
-        secure: false,
+        secure: true,
         sameSite: "none",
         maxAge: REFRESH_TOKEN_AGE_MS,
     });
