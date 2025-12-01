@@ -11,6 +11,8 @@ import commentsRouter from "./comments/comments.route";
 import usersRouter from "./users/users.route";
 
 const app = express();
+// 이 한 줄을 추가해야 Nginx/로드밸런서를 통해 들어온 https 요청을 인식합니다.
+app.set("trust proxy", 1);
 const port = 3000;
 
 // 추후 개발 환경에서 maxAge 줄이기
