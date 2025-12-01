@@ -146,12 +146,7 @@ export const kakaoLogin = async (
     // const isLocalRequest = origin && origin.includes("localhost");
     res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
-        // 배포된 서버는 HTTPS일 테니 true로 고정합니다.
-        // (크롬은 localhost에 한해 HTTPS가 아니어도 secure 쿠키를 허용해줍니다)
-        secure: true,
-
-        // [핵심] 로컬 요청이면 'none'으로 풀고, 실제 배포 환경이면 'strict'로 잠급니다.
-        // sameSite: isLocalRequest ? "none" : "strict",
+        secure: false,
         sameSite: "none",
         maxAge: REFRESH_TOKEN_AGE_MS,
     });
