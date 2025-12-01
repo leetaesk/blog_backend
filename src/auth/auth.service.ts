@@ -212,10 +212,16 @@ export const kakaoLogout = async (
     }
 
     // ⭐️ 3. 우리 서비스의 refreshToken 쿠키를 삭제합니다.
+    // res.clearCookie("refreshToken", {
+    //     httpOnly: true,
+    //     secure: process.env.NODE_ENV === "production",
+    //     sameSite: "strict",
+    // });
+
     res.clearCookie("refreshToken", {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
+        secure: true, // 로그인 때 true였으면 삭제할 때도 true여야 함
+        sameSite: "none", // 로그인 때 none이었으면 삭제할 때도 none이어야 함
     });
 
     // 4. 최종 성공 응답을 구성하여 반환합니다.
