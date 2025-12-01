@@ -130,7 +130,7 @@ export const kakaoLogin = async (
 
     // 4. 우리 서비스의 JWT 토큰을 생성합니다. (동일)
     const jwtPayload = { userId: user.id };
-    const accessToken = jwt.sign(jwtPayload, JWT_SECRET, { expiresIn: "2h" });
+    const accessToken = jwt.sign(jwtPayload, JWT_SECRET, { expiresIn: "15s" });
     const refreshToken = jwt.sign(jwtPayload, JWT_REFRESH_SECRET, {
         expiresIn: "12h",
     });
