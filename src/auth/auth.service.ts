@@ -71,10 +71,10 @@ export const kakaoLogin = async (
         }
     );
 
-    console.log(
-        "카카오 사용자 정보 응답:",
-        JSON.stringify(userResponse.data, null, 2)
-    );
+    // console.log(
+    //     "카카오 사용자 정보 응답:",
+    //     JSON.stringify(userResponse.data, null, 2)
+    // );
 
     const { id: kakaoId, properties } = userResponse.data;
 
@@ -129,10 +129,14 @@ export const kakaoLogin = async (
     }
 
     // 4. 우리 서비스의 JWT 토큰을 생성합니다. (동일)
+    const REFRESH_TOKEN_AGE_MS = 365 * 24 * 60 * 60 * 1000; // 1년 ㅋ
+    const ACCESS_TOKEN_AGE = "1h"; // 1시간 (보통 문자열로 라이브러리에 전달)
     const jwtPayload = { userId: user.id };
-    const accessToken = jwt.sign(jwtPayload, JWT_SECRET, { expiresIn: "15s" });
+    const accessToken = jwt.sign(jwtPayload, JWT_SECRET, {
+        expiresIn: ACCESS_TOKEN_AGE,
+    });
     const refreshToken = jwt.sign(jwtPayload, JWT_REFRESH_SECRET, {
-        expiresIn: "12h",
+        expiresIn: REFRESH_TOKEN_AGE_MS,
     });
 
     // 5. refreshToken을 httpOnly 쿠키에 담아 응답 헤더에 설정합니다. (동일)
@@ -149,7 +153,7 @@ export const kakaoLogin = async (
         // [핵심] 로컬 요청이면 'none'으로 풀고, 실제 배포 환경이면 'strict'로 잠급니다.
         // sameSite: isLocalRequest ? "none" : "strict",
         sameSite: "none",
-        maxAge: 14 * 24 * 60 * 60 * 1000,
+        maxAge: REFRESH_TOKEN_AGE_MS,
     });
 
     // 6. 클라이언트에 전달할 최종 응답 데이터를 구성합니다. (동일)
