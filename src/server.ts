@@ -9,22 +9,25 @@ import cookieParser from "cookie-parser";
 import likesRouter from "./likes/likes.route";
 import commentsRouter from "./comments/comments.route";
 import usersRouter from "./users/users.route";
+import { SitemapStream, streamToPromise } from "sitemap";
+import { createGzip } from "zlib";
 
 const app = express();
-// 이 한 줄을 추가해야 Nginx/로드밸런서를 통해 들어온 https 요청을 인식합니다.
 app.set("trust proxy", 1);
 const port = 3000;
 
-// 추후 개발 환경에서 maxAge 줄이기
 // const isProduction = process.env.NODE_ENV === "production";
 
 const allowedOrigins = [
     "http://localhost:5173",
     "https://blog-frontend-delta-five.vercel.app",
     "https://www.leetaesk.com",
+    "https://leetaesk.com", // www 없는 것도 추가해두면 좋습니다.
 ];
+
 const corsOptions = {
     origin: function (origin: any, callback: any) {
+        // !origin은 서버끼리의 통신이나 Postman 같은 도구를 위해 허용
         if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
             callback(null, true);
         } else {
@@ -32,18 +35,64 @@ const corsOptions = {
         }
     },
     credentials: true,
-    optionsSuccessStatus: 200, // 일부 구형 브라우저 호환성을 위해
+    optionsSuccessStatus: 200,
     maxAge: 86400,
-    // maxAge: isProduction ? 86400 : 600, // 운영: 24시간, 개발: 10분
 };
 
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
 app.use(cookieParser());
 
-// api 등록
+// ==========================================
+// 1. 일반 라우터 등록 (에러 핸들러보다 위에 있어야 함)
+// ==========================================
+
+app.get("/", (req, res) => {
+    res.send("Hello! My Blog Backend is Running! 🚀");
+});
+
+// sitemap.xml 라우터
+app.get("/sitemap.xml", async (req, res) => {
+    res.header("Content-Type", "application/xml");
+    res.header("Content-Encoding", "gzip");
+
+    try {
+        const smStream = new SitemapStream({
+            hostname: "https://leetaesk.com",
+        });
+        const pipeline = smStream.pipe(createGzip());
+
+        // 1. 고정 페이지 (메인)
+        smStream.write({ url: "/", changefreq: "daily", priority: 1.0 });
+
+        // 2. DB에서 게시글 가져오기 (SQL 방식 적용)
+        // 실제 테이블명(posts)과 컬럼명(id)에 맞춰 수정해주세요.
+        const postsResult = await query("SELECT id FROM posts");
+
+        if (postsResult.rows && postsResult.rows.length > 0) {
+            postsResult.rows.forEach((post: any) => {
+                // 프론트엔드 URL 구조에 맞게 수정 (/posts/1, /article/1 등)
+                smStream.write({
+                    url: `/posts/${post.id}`,
+                    changefreq: "weekly",
+                    priority: 0.8,
+                });
+            });
+        }
+
+        smStream.end();
+
+        pipeline.pipe(res).on("error", (e) => {
+            throw e;
+        });
+    } catch (e) {
+        console.error(e);
+        res.status(500).end();
+    }
+});
+
+// API 라우터들
 app.use("/api/posts", postsRouter);
 app.use("/api/categories", categoriesRouter);
 app.use("/api/auth", authRouter);
@@ -52,8 +101,9 @@ app.use("/api/likes", likesRouter);
 app.use("/api/comments", commentsRouter);
 app.use("/api/users", usersRouter);
 
-// ✨ ===== 중앙 에러 핸들링 미들웨어 추가 ===== ✨
-// ❗ 모든 라우터 등록 후에, 그리고 서버 실행(listen) 전에 위치해야 합니다.
+// ==========================================
+// 2. 에러 핸들링 미들웨어 (맨 마지막에 위치)
+// ==========================================
 app.use(
     (
         err: any,
@@ -61,7 +111,6 @@ app.use(
         res: express.Response,
         next: express.NextFunction
     ) => {
-        // Axios 에러인 경우 상세 에러를 로그에 남깁니다.
         if (err.isAxiosError) {
             console.error("🔥🔥🔥 Axios Error Details:", err.response?.data);
         } else {
@@ -92,10 +141,23 @@ app.use(
     }
 })();
 
-app.get("/", (req, res) => {
-    res.send("Hello! My Blog Backend is Running! 🚀");
-});
-
 app.listen(port, "0.0.0.0", () => {
-    console.log(`🚀 Backend server is running on port: ${port}`);
+    // 한국 시간(KST)으로 보기 좋게 포맷팅
+    const now = new Date().toLocaleString("ko-KR", {
+        timeZone: "Asia/Seoul",
+        hour12: false,
+    });
+
+    // 현재 실행 환경 (설정이 없으면 development로 표시)
+    const env = process.env.NODE_ENV || "development";
+
+    console.log(`
+  ################################======================
+  🛡️  Server listening on port: ${port}
+  ################################======================
+  📅  Time       : ${now} (KST)
+  🌍  Env        : ${env}
+  🔗  Local      : http://localhost:${port}
+  ------------------------------------------------------
+    `);
 });
