@@ -131,8 +131,8 @@ export const attachUserMiddleware = (
         // 4. (성공 시) req.user에 정보 첨부
         req.user = { userId: decoded.userId };
     } catch (error) {
-        // 5. (실패 시) 토큰이 유효하지 않음 -> 그냥 통과 (에러 반환 X)
-        // (예: 만료된 토큰을 가진 사용자가 글을 보는 경우)
+        // 5. (실패 시) 토큰이 만료되었거나 유효하지 않음 -> 401 에러 반환
+        return res.status(401).json({ message: "유효하지 않은 토큰입니다." });
     }
 
     // 6. 다음 미들웨어로 제어 전달
