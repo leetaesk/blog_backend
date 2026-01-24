@@ -19,7 +19,7 @@ const port = 3000;
 // const isProduction = process.env.NODE_ENV === "production";
 
 const allowedOrigins = [
-    "http://localhost:5173",
+    "http://localhost:3001",
     "https://blog-frontend-delta-five.vercel.app",
     "https://www.leetaesk.com",
     "https://leetaesk.com", // www 없는 것도 추가해두면 좋습니다.
