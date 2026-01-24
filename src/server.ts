@@ -31,6 +31,7 @@ const corsOptions = {
         if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
             callback(null, true);
         } else {
+            console.error(`🚫 CORS Blocked Origin: ${origin}`); // 디버깅용 로그 추가
             callback(new Error("Not allowed by CORS"));
         }
     },
@@ -48,8 +49,16 @@ app.use(cookieParser());
 // 1. 일반 라우터 등록 (에러 핸들러보다 위에 있어야 함)
 // ==========================================
 
+const serverStartTime = new Date().toLocaleString("ko-KR", {
+    timeZone: "Asia/Seoul",
+});
+
 app.get("/", (req, res) => {
-    res.send("Hello! My Blog Backend is Running! 🚀");
+    res.json({
+        message: "Hello! My Blog Backend is Running! 🚀",
+        deployedAt: serverStartTime,
+        env: process.env.NODE_ENV || "development",
+    });
 });
 
 // sitemap.xml 라우터
@@ -109,7 +118,7 @@ app.use(
         err: any,
         req: express.Request,
         res: express.Response,
-        next: express.NextFunction
+        next: express.NextFunction,
     ) => {
         if (err.isAxiosError) {
             console.error("🔥🔥🔥 Axios Error Details:", err.response?.data);
@@ -125,7 +134,7 @@ app.use(
             code: err.code || "UNKNOWN_ERROR",
             message,
         });
-    }
+    },
 );
 
 // DB 연결 테스트
@@ -134,7 +143,7 @@ app.use(
         const result = await query("SELECT NOW()");
         console.log(
             "✅ Database connection successful. Current time:",
-            result.rows[0].now
+            result.rows[0].now,
         );
     } catch (err) {
         console.error("🔥 Database connection failed.", err);
