@@ -23,6 +23,9 @@ build/
 .env.production.local
 .env.local
 
+# Docs
+docs/
+
 # Editor directories and files
 .vscode/
 .idea/

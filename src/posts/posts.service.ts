@@ -299,6 +299,8 @@ export const getPostById = async ({
     currentUserId,
 }: GetPostByIdRequestDto): Promise<GetPostByIdResultType | null> => {
     try {
+        await query('UPDATE posts SET views = views + 1 WHERE id = $1', [postId]);
+
         const postQueryStr = `
       SELECT
         p.id, p.title, p.content, p.thumbnail_url AS "thumbnailUrl", p.views,

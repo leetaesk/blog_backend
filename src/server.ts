@@ -13,7 +13,7 @@ import { SitemapStream, streamToPromise } from "sitemap";
 import { createGzip } from "zlib";
 
 const app = express();
-app.set("trust proxy", 1);
+app.set("trust proxy", 1); // 프록시 서버를 통한 요청을 신뢰
 const port = 3000;
 
 // const isProduction = process.env.NODE_ENV === "production";
@@ -22,7 +22,7 @@ const allowedOrigins = [
     "http://localhost:3001",
     "https://blog-frontend-delta-five.vercel.app",
     "https://www.leetaesk.com",
-    "https://leetaesk.com", // www 없는 것도 추가해두면 좋습니다.
+    "https://leetaesk.com",
 ];
 
 const corsOptions = {
