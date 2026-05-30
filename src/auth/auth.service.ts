@@ -2,6 +2,7 @@ import { Response } from "express";
 import axios from "axios";
 import * as jwt from "jsonwebtoken";
 import { query } from "../db";
+import { notifyDiscord } from "../utils/discordNotify";
 import {
     KakaoLoginRequestDto,
     KakaoLoginResponseDto,
@@ -107,6 +108,18 @@ export const kakaoLogin = async (
             kakaoProfileUrlFromApi, // 2. kakao_profile_url 에 저장
         ]);
         user = insertResult.rows[0];
+
+        // 디스코드 알림 (fire-and-forget: 실패해도 로그인에는 영향 없음)
+        notifyDiscord({
+            author: {
+                name: nickname,
+                iconUrl: kakaoProfileUrlFromApi,
+            },
+            title: "🎉 새 가입자",
+            description: `**${nickname}** 님이 카카오로 가입했습니다. 환영합니다! 👋`,
+            thumbnailUrl: kakaoProfileUrlFromApi,
+            color: 0x57f287,
+        });
     } else {
         // ⭐️ [수정] 기존 유저: kakao_profile_url만 업데이트 (profile_image_url은 건드리지 않음)
         const updateUserQuery = `

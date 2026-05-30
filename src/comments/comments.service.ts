@@ -1,4 +1,5 @@
 import { query } from "../db"; // (가정) DB 쿼리 함수
+import { notifyDiscord, SITE_URL } from "../utils/discordNotify";
 import {
     GetCommentsServiceDto,
     getCommentsResultType,
@@ -269,6 +270,45 @@ export const createComment = async (
         const result = await query(insertQuery, params);
 
         const newComment: createCommentResultType = result.rows[0];
+
+        // 디스코드 알림 (fire-and-forget: 실패해도 댓글 작성에는 영향 없음)
+        void (async () => {
+            try {
+                const infoResult = await query(
+                    `SELECT u.nickname AS nickname,
+                            u.profile_image_url AS "profileImageUrl",
+                            p.title AS title
+                     FROM users u, posts p
+                     WHERE u.id = $1 AND p.id = $2`,
+                    [userId, postId]
+                );
+                const info = infoResult.rows[0];
+                notifyDiscord({
+                    author: {
+                        name: info?.nickname ?? `user#${userId}`,
+                        iconUrl: info?.profileImageUrl,
+                    },
+                    title: parentCommentId ? "💬 새 답글" : "🗨️ 새 댓글",
+                    description:
+                        content.length > 200
+                            ? content.slice(0, 200) + "…"
+                            : content,
+                    fields: [
+                        {
+                            name: "게시글",
+                            value: info?.title ?? `#${postId}`,
+                        },
+                    ],
+                    color: parentCommentId ? 0x9b59b6 : 0x5865f2,
+                    url: `${SITE_URL}/posts/${postId}`,
+                });
+            } catch (notifyError) {
+                console.error(
+                    "⚠️ 댓글 디스코드 알림 준비 중 오류:",
+                    notifyError
+                );
+            }
+        })();
 
         return newComment;
     } catch (error) {

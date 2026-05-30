@@ -11,6 +11,10 @@ const config = {
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
   },
+  discord: {
+    // 데이터 변경(새 댓글/가입 등) 알림을 보낼 디스코드 Incoming Webhook URL
+    webhookUrl: process.env.DISCORD_WEBHOOK_URL,
+  },
 };
 
 export default config;
