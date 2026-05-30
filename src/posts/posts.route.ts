@@ -1,11 +1,15 @@
 import { Router } from "express";
 import {
+    createDraftController,
+    deleteDraftController,
     deletePostController,
     getArchiveController,
     getArchiveLikedByMeController,
+    getDraftsController,
     getPostByIdController,
     getPostForEditController,
     postPostController,
+    updateDraftController,
     updatePostController,
 } from "./posts.controller";
 import { attachUserMiddleware, authMiddleware } from "../auth/auth.middleware";
@@ -23,6 +27,15 @@ router.get(
     authMiddleware, // 1. 로그인 확인
     getArchiveLikedByMeController
 );
+
+// ⭐️ (신규) 임시저장(Draft) — 모두 로그인 필요
+// ❗️ 반드시 "/:postId" 라우트보다 위에 두어야 함.
+//    안 그러면 GET /drafts 가 GET /:postId 에 먼저 매칭되어 parseInt("drafts")=NaN 으로 깨짐.
+//    (/liked-by/me 가 위에 있는 것과 동일 패턴)
+router.get("/drafts", authMiddleware, getDraftsController);
+router.post("/drafts", authMiddleware, createDraftController);
+router.put("/drafts/:draftId", authMiddleware, updateDraftController);
+router.delete("/drafts/:draftId", authMiddleware, deleteDraftController);
 
 // POST /api/posts
 // 글 작성

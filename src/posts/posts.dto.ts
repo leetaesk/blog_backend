@@ -145,13 +145,51 @@ export interface DeletePostResultType {
 }
 export type DeletePostResponseDto = CommonResponseDto<DeletePostResultType>;
 
+// =============================================
+// Draft (임시저장)
+//   GET    /api/posts/drafts        → DraftDetail[]
+//   POST   /api/posts/drafts        → { id, updatedAt }
+//   PUT    /api/posts/drafts/:id    → { updatedAt }
+//   DELETE /api/posts/drafts/:id    → 성공 여부
+// =============================================
+
+// 임시글 저장 요청 본문(작성 도중이라 미완성 가능). categoryId는 null 허용.
+export interface DraftPayload {
+    title: string;
+    content: string; // 본문 HTML
+    categoryId: number | null;
+    summary: string;
+    thumbnailUrl: string;
+    tags: string[];
+}
+
+// 임시글 1건(목록/선택 시). 본문 포함.
+export interface DraftDetail extends DraftPayload {
+    id: number;
+    updatedAt: string; // 'YYYY-MM-DD HH24:MI:SS'
+}
+
+export type GetDraftsResultType = DraftDetail[];
+export type GetDraftsResponseDto = CommonResponseDto<GetDraftsResultType>;
+
+export interface CreateDraftResultType {
+    id: number;
+    updatedAt: string;
+}
+export type CreateDraftResponseDto = CommonResponseDto<CreateDraftResultType>;
+
+export interface UpdateDraftResultType {
+    updatedAt: string;
+}
+export type UpdateDraftResponseDto = CommonResponseDto<UpdateDraftResultType>;
+
 export interface GetPostForEditRequestDto {
     postId: number;
 }
 
 export interface GetPostForEditResultType {
     title: string;
-    content: string; // ❗️ 원본 Markdown
+    content: string; // ❗️ 저장된 HTML 원본 (BlockNote 직렬화 결과)
     summary: string | null;
     thumbnailUrl: string | null;
     categoryId: number | null;

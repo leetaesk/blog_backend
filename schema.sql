@@ -135,6 +135,48 @@ CREATE TABLE public.post_tags (
 ALTER TABLE public.post_tags OWNER TO postgres;
 
 --
+-- Name: drafts; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.drafts (
+    id integer NOT NULL,
+    user_id integer NOT NULL,
+    title character varying(255) DEFAULT ''::character varying NOT NULL,
+    content text DEFAULT ''::text NOT NULL,
+    summary character varying(255),
+    thumbnail_url character varying(255),
+    category_id integer,
+    tags text[] DEFAULT '{}'::text[] NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+ALTER TABLE public.drafts OWNER TO postgres;
+
+--
+-- Name: drafts_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.drafts_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.drafts_id_seq OWNER TO postgres;
+
+--
+-- Name: drafts_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.drafts_id_seq OWNED BY public.drafts.id;
+
+
+--
 -- Name: posts; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -268,6 +310,13 @@ ALTER TABLE ONLY public.comments ALTER COLUMN id SET DEFAULT nextval('public.com
 
 
 --
+-- Name: drafts id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.drafts ALTER COLUMN id SET DEFAULT nextval('public.drafts_id_seq'::regclass);
+
+
+--
 -- Name: posts id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -334,6 +383,21 @@ ALTER TABLE ONLY public.likes
 
 ALTER TABLE ONLY public.post_tags
     ADD CONSTRAINT post_tags_pkey PRIMARY KEY (post_id, tag_id);
+
+
+--
+-- Name: drafts drafts_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.drafts
+    ADD CONSTRAINT drafts_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: idx_drafts_user_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_drafts_user_id ON public.drafts USING btree (user_id);
 
 
 --
@@ -422,6 +486,22 @@ ALTER TABLE ONLY public.comments
 
 ALTER TABLE ONLY public.comments
     ADD CONSTRAINT fk_parent_comment FOREIGN KEY (parent_comment_id) REFERENCES public.comments(id) ON DELETE CASCADE;
+
+
+--
+-- Name: drafts drafts_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.drafts
+    ADD CONSTRAINT drafts_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: drafts drafts_category_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.drafts
+    ADD CONSTRAINT drafts_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.categories(id) ON DELETE SET NULL;
 
 
 --

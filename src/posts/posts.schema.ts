@@ -68,3 +68,19 @@ export const createPostSchema = z.object({
 export type PostPostRequestDto = z.infer<typeof createPostSchema>;
 
 export const updatePostSchema = createPostSchema.partial();
+
+// =============================================
+// Draft (임시저장) — createPostSchema와 달리 느슨하게.
+// 작성 도중이라 모든 값이 미완성일 수 있으므로 빈 값/기본값 허용.
+// thumbnailUrl에 .url() 검증을 절대 걸지 말 것 (빈 문자열 허용).
+// =============================================
+export const draftSchema = z.object({
+    title: z.string().default(""),
+    content: z.string().default(""), // 본문 HTML, 빈 문자열 허용
+    categoryId: z.number().nullable().default(null),
+    summary: z.string().default(""),
+    thumbnailUrl: z.string().default(""),
+    tags: z.array(z.string()).default([]),
+});
+
+export type DraftSchemaType = z.infer<typeof draftSchema>;

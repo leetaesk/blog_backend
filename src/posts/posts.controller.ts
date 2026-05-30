@@ -1,11 +1,15 @@
 import { Request, Response, NextFunction } from "express"; // ✨ NextFunction 추가
 import {
+    createDraft,
+    deleteDraft,
     deletePost,
     getArchive,
     getArchiveLikedByMe,
+    getDrafts,
     getPostById,
     getPostForEdit,
     postPost,
+    updateDraft,
     updatePost,
 } from "./posts.service";
 import {
@@ -16,7 +20,7 @@ import {
     PostPostRequestDto,
     UpdatePostRequestDto,
 } from "./posts.dto";
-import { createPostSchema, updatePostSchema } from "./posts.schema";
+import { createPostSchema, draftSchema, updatePostSchema } from "./posts.schema";
 import { ZodError } from "zod";
 
 export const getArchiveController = async (
@@ -290,6 +294,170 @@ export const getPostForEditController = async (
             code: "SUCCESS",
             message: "Post data for edit retrieved successfully.",
             result,
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// =============================================
+// Draft (임시저장) 컨트롤러 — 모두 authMiddleware 선행(로그인 필수)
+// =============================================
+
+// GET /api/posts/drafts — 내 임시글 목록
+export const getDraftsController = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+) => {
+    try {
+        const userId = req.user?.userId;
+        if (!userId) {
+            const err = new Error("인증 정보가 없습니다.");
+            (err as any).status = 401;
+            throw err;
+        }
+
+        const result = await getDrafts(userId);
+
+        return res.status(200).json({
+            isSuccess: true,
+            code: "SUCCESS",
+            message: "Drafts retrieved successfully.",
+            result, // 없으면 []
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// POST /api/posts/drafts — 새 임시글 생성
+export const createDraftController = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+) => {
+    try {
+        const userId = req.user?.userId;
+        if (!userId) {
+            const err = new Error("인증 정보가 없습니다.");
+            (err as any).status = 401;
+            throw err;
+        }
+
+        const payload = draftSchema.parse(req.body);
+        const result = await createDraft(userId, payload);
+
+        return res.status(201).json({
+            isSuccess: true,
+            code: "SUCCESS",
+            message: "Draft created successfully.",
+            result,
+        });
+    } catch (error) {
+        if (error instanceof ZodError) {
+            return res.status(400).json({
+                isSuccess: false,
+                code: "BAD_REQUEST",
+                message: "Invalid input.",
+                errors: error.flatten().fieldErrors,
+            });
+        }
+        next(error);
+    }
+};
+
+// PUT /api/posts/drafts/:draftId — 임시글 수정(본인 것만)
+export const updateDraftController = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+) => {
+    try {
+        const userId = req.user?.userId;
+        if (!userId) {
+            const err = new Error("인증 정보가 없습니다.");
+            (err as any).status = 401;
+            throw err;
+        }
+
+        const draftId = parseInt(req.params.draftId, 10);
+        if (isNaN(draftId)) {
+            return res.status(400).json({
+                isSuccess: false,
+                code: "BAD_REQUEST",
+                message: "Draft ID must be a valid number.",
+            });
+        }
+
+        const payload = draftSchema.parse(req.body);
+        const result = await updateDraft(userId, draftId, payload);
+
+        // 없거나 소유자가 아니면 null
+        if (!result) {
+            return res.status(404).json({
+                isSuccess: false,
+                code: "NOT_FOUND",
+                message: "Draft not found.",
+            });
+        }
+
+        return res.status(200).json({
+            isSuccess: true,
+            code: "SUCCESS",
+            message: "Draft updated successfully.",
+            result,
+        });
+    } catch (error) {
+        if (error instanceof ZodError) {
+            return res.status(400).json({
+                isSuccess: false,
+                code: "BAD_REQUEST",
+                message: "Invalid input.",
+                errors: error.flatten().fieldErrors,
+            });
+        }
+        next(error);
+    }
+};
+
+// DELETE /api/posts/drafts/:draftId — 임시글 삭제(본인 것만)
+export const deleteDraftController = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+) => {
+    try {
+        const userId = req.user?.userId;
+        if (!userId) {
+            const err = new Error("인증 정보가 없습니다.");
+            (err as any).status = 401;
+            throw err;
+        }
+
+        const draftId = parseInt(req.params.draftId, 10);
+        if (isNaN(draftId)) {
+            return res.status(400).json({
+                isSuccess: false,
+                code: "BAD_REQUEST",
+                message: "Draft ID must be a valid number.",
+            });
+        }
+
+        const deleted = await deleteDraft(userId, draftId);
+        if (!deleted) {
+            return res.status(404).json({
+                isSuccess: false,
+                code: "NOT_FOUND",
+                message: "Draft not found.",
+            });
+        }
+
+        return res.status(200).json({
+            isSuccess: true,
+            code: "SUCCESS",
+            message: "Draft deleted successfully.",
+            result: { draftId },
         });
     } catch (error) {
         next(error);

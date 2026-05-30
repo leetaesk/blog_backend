@@ -1,10 +1,13 @@
 // src/api/posts/posts.service.ts
 
-import { marked } from "marked";
-import createDOMPurify from "dompurify";
-import { JSDOM } from "jsdom";
 import pool, { query } from "../db";
+import { sanitizeHtml } from "../utils/sanitize";
 import {
+    CreateDraftResultType,
+    DraftDetail,
+    DraftPayload,
+    GetDraftsResultType,
+    UpdateDraftResultType,
     DeletePostRequestDto,
     DeletePostResultType,
     GetArchiveLikedByMeRequestDto,
@@ -21,13 +24,6 @@ import {
     UpdatePostRequestDto,
     UpdatePostResultType,
 } from "./posts.dto";
-import { Marked } from "marked";
-import { markedHighlight } from "marked-highlight";
-import hljs from "highlight.js";
-
-// DOMPurify는 브라우저 환경의 DOM API가 필요하므로, Node.js 환경에서는 jsdom으로 가상 DOM을 만들어줍니다.
-const window = new JSDOM("").window;
-const DOMPurify = createDOMPurify(window as any);
 
 //기본값 12
 const POSTS_PER_PAGE = 12;
@@ -337,29 +333,8 @@ export const getPostById = async ({
         `;
         const tagsResult = await query(tagsQueryStr, [postId]);
 
-        // ⭐️ [변경] 1. Marked 인스턴스 생성 (highlight 설정 주입)
-        const marked = new Marked(
-            markedHighlight({
-                langPrefix: "hljs language-", // highlight.js CSS 클래스 규칙
-                highlight(code, lang) {
-                    // 언어가 지정되어 있고 highlight.js가 지원하는 언어라면 해당 언어로, 아니면 텍스트로 처리
-                    const language = hljs.getLanguage(lang)
-                        ? lang
-                        : "plaintext";
-                    return hljs.highlight(code, { language }).value;
-                },
-            })
-        );
-
-        // ⭐️ [변경] 2. 변환 실행 (await는 marked 설정에 따라 필요할 수도 있으니 유지)
-        const rawHtml = (await marked.parse(postRow.content || "")) as string;
-
-        // ⭐️ [변경] 3. DOMPurify 설정 변경 (중요!)
-        // 기본 설정은 class를 다 지워버리므로, highlight용 class와 태그를 허용해줘야 함
-        const sanitizedHtml = DOMPurify.sanitize(rawHtml, {
-            ADD_TAGS: ["span"], // highlight.js는 <span> 태그를 사용함
-            ADD_ATTR: ["class"], // class="hljs..." 속성을 허용함
-        });
+        // content는 이제 프론트(BlockNote)가 저장한 HTML이므로 마크다운 변환 없이 sanitize만 한다.
+        const sanitizedHtml = sanitizeHtml(postRow.content);
 
         // 최종 데이터 조립
         const result: GetPostByIdResultType = {
@@ -418,7 +393,7 @@ export const postPost = async (
         const postValues = [
             userId,
             dto.title,
-            dto.content,
+            sanitizeHtml(dto.content), // 저장 전 서버에서 HTML 방어
             dto.summary,
             dto.categoryId,
             dto.thumbnailUrl,
@@ -522,7 +497,12 @@ export const updatePost = async (
                 .join(", ");
 
             // updateValues도 필터링된 updateFields 기준으로 생성해야 합니다.
-            const updateValues = updateFields.map((key) => updateData[key]);
+            // content는 HTML이므로 저장 전 서버에서 sanitize.
+            const updateValues = updateFields.map((key) =>
+                key === "content"
+                    ? sanitizeHtml(updateData[key] as string)
+                    : updateData[key]
+            );
 
             // 2. posts 테이블 업데이트
             const updatePostQuery = `
@@ -637,7 +617,7 @@ export const getPostForEdit = async ({
         // 3. 원본 데이터와 태그 이름을 조합하여 반환합니다.
         return {
             title: postRow.title,
-            content: postRow.content, // ❗️ HTML 변환 없음
+            content: postRow.content, // content는 저장된 HTML 원본 그대로 (수정기 BlockNote가 직접 로드)
             summary: postRow.summary,
             thumbnailUrl: postRow.thumbnailUrl,
             categoryId: postRow.categoryId,
@@ -650,4 +630,107 @@ export const getPostForEdit = async ({
         );
         throw error;
     }
+};
+
+// =============================================
+// Draft (임시저장) 서비스
+//   - 본인 임시글만 대상: 모든 쿼리에 user_id 조건 강제.
+//   - content는 HTML이므로 저장 전 sanitize.
+//   - tags는 정규화 없이 text[]로 저장(pg가 JS 배열을 그대로 매핑).
+// =============================================
+
+const UPDATED_AT_FMT = "to_char(updated_at, 'YYYY-MM-DD HH24:MI:SS')";
+
+/** 내 임시글 목록(본문 포함). 최근 수정 순. */
+export const getDrafts = async (
+    userId: number
+): Promise<GetDraftsResultType> => {
+    const queryStr = `
+        SELECT
+            id, title, content, summary,
+            category_id   AS "categoryId",
+            thumbnail_url AS "thumbnailUrl",
+            tags,
+            ${UPDATED_AT_FMT} AS "updatedAt"
+        FROM drafts
+        WHERE user_id = $1
+        ORDER BY updated_at DESC
+    `;
+    const result = await query(queryStr, [userId]);
+
+    return result.rows.map(
+        (row): DraftDetail => ({
+            id: row.id,
+            title: row.title,
+            content: row.content,
+            categoryId: row.categoryId,
+            summary: row.summary ?? "",
+            thumbnailUrl: row.thumbnailUrl ?? "",
+            tags: row.tags ?? [],
+            updatedAt: row.updatedAt,
+        })
+    );
+};
+
+/** 새 임시글 생성. */
+export const createDraft = async (
+    userId: number,
+    payload: DraftPayload
+): Promise<CreateDraftResultType> => {
+    const queryStr = `
+        INSERT INTO drafts (user_id, title, content, summary, thumbnail_url, category_id, tags)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING id, ${UPDATED_AT_FMT} AS "updatedAt"
+    `;
+    const values = [
+        userId,
+        payload.title,
+        sanitizeHtml(payload.content),
+        payload.summary,
+        payload.thumbnailUrl,
+        payload.categoryId,
+        payload.tags,
+    ];
+    const result = await query(queryStr, values);
+    return { id: result.rows[0].id, updatedAt: result.rows[0].updatedAt };
+};
+
+/** 임시글 수정(본인 것만). 없거나 소유자가 아니면 null 반환. */
+export const updateDraft = async (
+    userId: number,
+    draftId: number,
+    payload: DraftPayload
+): Promise<UpdateDraftResultType | null> => {
+    const queryStr = `
+        UPDATE drafts
+        SET title = $1, content = $2, summary = $3, thumbnail_url = $4,
+            category_id = $5, tags = $6, updated_at = CURRENT_TIMESTAMP
+        WHERE id = $7 AND user_id = $8
+        RETURNING ${UPDATED_AT_FMT} AS "updatedAt"
+    `;
+    const values = [
+        payload.title,
+        sanitizeHtml(payload.content),
+        payload.summary,
+        payload.thumbnailUrl,
+        payload.categoryId,
+        payload.tags,
+        draftId,
+        userId,
+    ];
+    const result = await query(queryStr, values);
+    if (result.rows.length === 0) return null;
+    return { updatedAt: result.rows[0].updatedAt };
+};
+
+/** 임시글 삭제(본인 것만). 삭제된 게 없으면 false. */
+export const deleteDraft = async (
+    userId: number,
+    draftId: number
+): Promise<boolean> => {
+    const result = await query(
+        "DELETE FROM drafts WHERE id = $1 AND user_id = $2 RETURNING id",
+        [draftId, userId]
+    );
+    return (result.rowCount ?? 0) > 0;
 };
