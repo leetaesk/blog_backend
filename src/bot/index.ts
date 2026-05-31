@@ -239,8 +239,27 @@ export const startBot = (): void => {
             return;
         }
 
+        // (3) 기타 텍스트 파일 첨부 → 내용을 읽어 Claude가 참고하도록 메시지에 첨부
+        //     (파일 쓰기 도구는 꺼져 있으므로 봇이 직접 내용을 실어준다)
+        let attachmentText = "";
+        const textAttach = message.attachments.find(
+            (a) => !a.contentType?.startsWith("image/")
+        );
+        if (textAttach) {
+            try {
+                const res = await fetch(textAttach.url);
+                const raw = (await res.text()).slice(0, 20000); // 과도한 길이 차단
+                attachmentText = `\n\n[첨부파일: ${textAttach.name}]\n\`\`\`\n${raw}\n\`\`\``;
+            } catch (err) {
+                console.error("⚠️ 첨부파일 읽기 실패:", err);
+                await channel
+                    .send("⚠️ 첨부파일을 읽지 못했어요.")
+                    .catch(() => {});
+            }
+        }
+
         const content = message.content.trim();
-        if (!content) return;
+        if (!content && !attachmentText) return;
 
         await channel.sendTyping().catch(() => {});
 
@@ -249,7 +268,7 @@ export const startBot = (): void => {
                 session.categories.map((c) => c.name)
             );
             const { text, sessionId } = await askClaude(
-                content,
+                (content + attachmentText).trim(),
                 session.claudeSessionId,
                 systemPrompt
             );
