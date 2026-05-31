@@ -11,6 +11,7 @@ import commentsRouter from "./comments/comments.route";
 import usersRouter from "./users/users.route";
 import { SitemapStream, streamToPromise } from "sitemap";
 import { createGzip } from "zlib";
+import { startBot } from "./bot";
 
 const app = express();
 app.set("trust proxy", 1); // 프록시 서버를 통한 요청을 신뢰
@@ -169,4 +170,7 @@ app.listen(port, "0.0.0.0", () => {
   🔗  Local      : http://localhost:${port}
   ------------------------------------------------------
     `);
+
+    // 디스코드 글쓰기 봇 시작 (토큰 없으면 내부에서 자동 비활성화)
+    startBot();
 });
