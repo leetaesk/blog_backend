@@ -18,6 +18,8 @@ const config = {
     botToken: process.env.DISCORD_BOT_TOKEN,
     ownerId: process.env.DISCORD_OWNER_ID, // 봇을 쓸 수 있는 유일한 디스코드 user id
     guildId: process.env.DISCORD_GUILD_ID, // 슬래시 명령을 즉시 등록할 서버 id
+    // 봇이 발행/임시저장하는 글의 작성자(블로그 DB의 user id, 보통 admin 본인)
+    authorUserId: Number(process.env.BLOG_AUTHOR_USER_ID),
   },
 };
 

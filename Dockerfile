@@ -24,8 +24,9 @@ RUN pnpm run build
 FROM node:20
 WORKDIR /app
 
-# 1. 여기도 pnpm 설치
-RUN npm install -g pnpm
+# 1. pnpm + claude CLI 설치
+#    (디스코드 글쓰기 봇이 런타임에 `claude`를 spawn하므로 컨테이너에 반드시 필요)
+RUN npm install -g pnpm @anthropic-ai/claude-code
 
 # 2. 설정 파일 복사
 COPY package.json pnpm-lock.yaml ./
