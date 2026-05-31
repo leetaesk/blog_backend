@@ -10,18 +10,20 @@ const s3Client = new S3Client({
 });
 
 /**
- * 이미지를 AWS S3에 업로드하고, 해당 이미지의 URL을 반환합니다.
+ * 버퍼(이미지 바이트)를 AWS S3에 업로드하고, 해당 이미지의 공개 URL을 반환합니다.
  */
-export const uploadImage = async (
-    file: Express.Multer.File
+export const uploadBuffer = async (
+    buffer: Buffer,
+    originalname: string,
+    mimetype: string
 ): Promise<string> => {
-    const key = `images/${uuidv4()}-${file.originalname}`;
+    const key = `images/${uuidv4()}-${originalname}`;
 
     const command = new PutObjectCommand({
         Bucket: process.env.AWS_S3_BUCKET_NAME!,
         Key: key,
-        Body: file.buffer,
-        ContentType: file.mimetype,
+        Body: buffer,
+        ContentType: mimetype,
         ACL: "public-read",
     });
 
@@ -32,4 +34,13 @@ export const uploadImage = async (
         console.error("S3 이미지 업로드 중 에러 발생:", error);
         throw new Error("S3에 이미지를 업로드하는 데 실패했습니다.");
     }
+};
+
+/**
+ * 이미지를 AWS S3에 업로드하고, 해당 이미지의 URL을 반환합니다.
+ */
+export const uploadImage = async (
+    file: Express.Multer.File
+): Promise<string> => {
+    return uploadBuffer(file.buffer, file.originalname, file.mimetype);
 };

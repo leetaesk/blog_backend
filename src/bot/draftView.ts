@@ -34,16 +34,25 @@ export const buildDraftMessage = (draft: ParsedDraft): BaseMessageOptions => {
                     ? draft.tags.map((t) => `#${t}`).join(" ")
                     : "(없음)",
                 inline: true,
+            },
+            {
+                name: "썸네일",
+                value: draft.thumbnailUrl ? "있음 ✅" : "없음",
+                inline: true,
             }
         )
         .setFooter({ text: "초안 미리보기 · 아래 버튼으로 진행하세요" });
+
+    if (draft.thumbnailUrl) {
+        embed.setImage(draft.thumbnailUrl);
+    }
 
     const file = new AttachmentBuilder(
         Buffer.from(draft.bodyMarkdown || "", "utf8"),
         { name: "draft.md" }
     );
 
-    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    const actionRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder()
             .setCustomId("publish")
             .setLabel("발행")
@@ -66,5 +75,23 @@ export const buildDraftMessage = (draft: ParsedDraft): BaseMessageOptions => {
             .setStyle(ButtonStyle.Danger)
     );
 
-    return { embeds: [embed], files: [file], components: [row] };
+    const thumbRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+            .setCustomId("ai_thumb")
+            .setLabel("AI 썸네일")
+            .setEmoji("🎨")
+            .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+            .setCustomId("remove_thumb")
+            .setLabel("썸네일 제거")
+            .setEmoji("🖼️")
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(!draft.thumbnailUrl)
+    );
+
+    return {
+        embeds: [embed],
+        files: [file],
+        components: [actionRow, thumbRow],
+    };
 };

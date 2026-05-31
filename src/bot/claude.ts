@@ -47,6 +47,7 @@ export interface ParsedDraft {
     category: string;
     tags: string[];
     bodyMarkdown: string;
+    thumbnailUrl?: string; // 썸네일 이미지 URL (수동 업로드 또는 그록 생성)
 }
 
 export interface ParseResult {

@@ -28,8 +28,10 @@ import {
 } from "./claude";
 import { buildDraftMessage } from "./draftView";
 import { markdownToHtml } from "./markdown";
+import { generateImage } from "./grok";
 import { postPost, createDraft } from "../posts/posts.service";
 import { getCategories, createCategory } from "../categories/categories.service";
+import { uploadBuffer } from "../images/images.service";
 
 const { botToken, ownerId, guildId, authorUserId } = config.discord;
 const SITE_URL = "https://leetaesk.com";
@@ -174,7 +176,42 @@ export const startBot = (): void => {
         const channel = message.channel;
         if (!channel.isThread()) return;
 
-        // (1) .md 파일 직접 업로드 → 본문 교체
+        // (1) 이미지 파일 첨부 → S3 업로드 후 썸네일로 설정
+        const imageAttach = message.attachments.find(
+            (a) =>
+                a.contentType?.startsWith("image/") ||
+                /\.(png|jpe?g|webp|gif)$/i.test(a.name ?? "")
+        );
+        if (imageAttach) {
+            if (!session.draft) {
+                await channel
+                    .send(
+                        "먼저 대화로 초안을 만든 뒤 썸네일을 추가해주세요."
+                    )
+                    .catch(() => {});
+                return;
+            }
+            try {
+                const resp = await fetch(imageAttach.url);
+                const buf = Buffer.from(await resp.arrayBuffer());
+                const url = await uploadBuffer(
+                    buf,
+                    imageAttach.name ?? "thumbnail.png",
+                    imageAttach.contentType ?? "image/png"
+                );
+                session.draft.thumbnailUrl = url;
+                await channel.send("🖼️ 썸네일을 설정했어요.");
+                await channel.send(buildDraftMessage(session.draft));
+            } catch (err) {
+                console.error("⚠️ 썸네일 업로드 실패:", err);
+                await channel
+                    .send("⚠️ 이미지를 업로드하지 못했어요.")
+                    .catch(() => {});
+            }
+            return;
+        }
+
+        // (2) .md 파일 직접 업로드 → 본문 교체
         const mdAttach = message.attachments.find((a) =>
             a.name?.toLowerCase().endsWith(".md")
         );
@@ -221,6 +258,8 @@ export const startBot = (): void => {
             const { chat, draft } = parseDraft(text);
             await sendChunked(channel, chat);
             if (draft) {
+                // 기존 썸네일은 초안 갱신 시에도 유지
+                draft.thumbnailUrl = session.draft?.thumbnailUrl;
                 session.draft = draft;
                 await channel.send(buildDraftMessage(draft));
             }
@@ -352,6 +391,21 @@ const handleButton = async (interaction: ButtonInteraction): Promise<void> => {
         return;
     }
 
+    // 썸네일 관련 (작성자 id 불필요)
+    if (interaction.customId === "ai_thumb") {
+        await openThumbModal(interaction);
+        return;
+    }
+    if (interaction.customId === "remove_thumb") {
+        draft.thumbnailUrl = undefined;
+        await interaction.reply("🖼️ 썸네일을 제거했어요.");
+        const ch = interaction.channel;
+        if (ch && ch.isThread()) {
+            await ch.send(buildDraftMessage(draft));
+        }
+        return;
+    }
+
     if (!authorUserId || Number.isNaN(authorUserId)) {
         await interaction.reply({
             content:
@@ -371,7 +425,7 @@ const handleButton = async (interaction: ButtonInteraction): Promise<void> => {
                 content: html,
                 summary: draft.summary || draft.title,
                 categoryId,
-                thumbnailUrl: "",
+                thumbnailUrl: draft.thumbnailUrl ?? "",
                 tags: draft.tags,
             });
             const postId = result.result.postId;
@@ -398,7 +452,7 @@ const handleButton = async (interaction: ButtonInteraction): Promise<void> => {
                 content: html,
                 summary: draft.summary,
                 categoryId,
-                thumbnailUrl: "",
+                thumbnailUrl: draft.thumbnailUrl ?? "",
                 tags: draft.tags,
             });
             await interaction.editReply(
@@ -473,11 +527,33 @@ const openEditModal = async (
     await interaction.showModal(modal);
 };
 
+// AI 썸네일 프롬프트 입력 모달
+const openThumbModal = async (
+    interaction: ButtonInteraction
+): Promise<void> => {
+    const modal = new ModalBuilder()
+        .setCustomId("thumb_modal")
+        .setTitle("AI 썸네일 생성 (그록)");
+
+    const promptInput = new TextInputBuilder()
+        .setCustomId("prompt")
+        .setLabel("이미지 프롬프트 (영어 권장)")
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder(
+            "e.g. minimal abstract tech cover, blue gradient, no text"
+        )
+        .setMaxLength(1000)
+        .setRequired(true);
+
+    modal.addComponents(
+        new ActionRowBuilder<TextInputBuilder>().addComponents(promptInput)
+    );
+    await interaction.showModal(modal);
+};
+
 const handleModalSubmit = async (
     interaction: ModalSubmitInteraction
 ): Promise<void> => {
-    if (interaction.customId !== "edit_modal") return;
-
     const session = sessions.get(interaction.channelId ?? "");
     if (!session || !session.draft) {
         await interaction.reply({
@@ -486,6 +562,32 @@ const handleModalSubmit = async (
         });
         return;
     }
+
+    // AI 썸네일 생성 모달
+    if (interaction.customId === "thumb_modal") {
+        const prompt = interaction.fields.getTextInputValue("prompt");
+        await interaction.deferReply();
+        try {
+            const { buffer, contentType } = await generateImage(prompt);
+            const ext = contentType.includes("png") ? "png" : "jpg";
+            const url = await uploadBuffer(buffer, `thumb.${ext}`, contentType);
+            session.draft.thumbnailUrl = url;
+            await interaction.editReply("🎨 AI 썸네일을 생성했어요 👇");
+            const ch = interaction.channel;
+            if (ch && ch.isThread()) {
+                await ch.send(buildDraftMessage(session.draft));
+            }
+        } catch (err) {
+            console.error("⚠️ AI 썸네일 생성 실패:", err);
+            const msg = err instanceof Error ? err.message : String(err);
+            await interaction.editReply(
+                `⚠️ 썸네일 생성 실패: ${msg.slice(0, 300)}`
+            );
+        }
+        return;
+    }
+
+    if (interaction.customId !== "edit_modal") return;
 
     session.draft.title = interaction.fields
         .getTextInputValue("title")

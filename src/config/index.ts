@@ -21,6 +21,10 @@ const config = {
     // 봇이 발행/임시저장하는 글의 작성자(블로그 DB의 user id, 보통 admin 본인)
     authorUserId: Number(process.env.BLOG_AUTHOR_USER_ID),
   },
+  xai: {
+    // 그록 이미지 생성용 API 키 (썸네일 생성)
+    apiKey: process.env.XAI_API_KEY,
+  },
 };
 
 export default config;
