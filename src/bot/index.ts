@@ -28,7 +28,7 @@ import {
 } from "./claude";
 import { buildDraftMessage } from "./draftView";
 import { markdownToHtml } from "./markdown";
-import { generateImage } from "./grok";
+import { generateImage, editImage, MAX_REF_IMAGES } from "./grok";
 import { postPost, createDraft } from "../posts/posts.service";
 import { getCategories, createCategory } from "../categories/categories.service";
 import { uploadBuffer } from "../images/images.service";
@@ -176,13 +176,15 @@ export const startBot = (): void => {
         const channel = message.channel;
         if (!channel.isThread()) return;
 
-        // (1) 이미지 파일 첨부 → S3 업로드 후 썸네일로 설정
-        const imageAttach = message.attachments.find(
+        // (1) 이미지 첨부 처리 — 캡션(프롬프트) 유무로 동작을 판단
+        //   · 캡션이 함께 오면 → 사진(최대 3장)을 입력으로 그록이 AI 썸네일 생성
+        //   · 캡션이 없으면     → 첫 사진을 그대로 썸네일로 설정 (기존 동작)
+        const imageAttaches = [...message.attachments.values()].filter(
             (a) =>
                 a.contentType?.startsWith("image/") ||
                 /\.(png|jpe?g|webp|gif)$/i.test(a.name ?? "")
         );
-        if (imageAttach) {
+        if (imageAttaches.length > 0) {
             if (!session.draft) {
                 await channel
                     .send(
@@ -191,16 +193,58 @@ export const startBot = (): void => {
                     .catch(() => {});
                 return;
             }
+
+            const caption = message.content.trim();
+
+            // (1-a) 캡션이 있으면 → 사진을 입력으로 그록 생성
+            if (caption) {
+                const refs = imageAttaches.slice(0, MAX_REF_IMAGES);
+                await channel.sendTyping().catch(() => {});
+                try {
+                    const { buffer, contentType } = await editImage(
+                        caption,
+                        refs.map((a) => a.url)
+                    );
+                    const ext = contentType.includes("png") ? "png" : "jpg";
+                    const url = await uploadBuffer(
+                        buffer,
+                        `thumb.${ext}`,
+                        contentType
+                    );
+                    session.draft.thumbnailUrl = url;
+                    const extra =
+                        imageAttaches.length > MAX_REF_IMAGES
+                            ? ` (참고 사진은 처음 ${MAX_REF_IMAGES}장만 사용했어요)`
+                            : "";
+                    await channel.send(
+                        `🎨 사진 ${refs.length}장을 참고해 AI 썸네일을 생성했어요${extra} 👇`
+                    );
+                    await channel.send(buildDraftMessage(session.draft));
+                } catch (err) {
+                    console.error("⚠️ AI 썸네일(사진 입력) 생성 실패:", err);
+                    const msg =
+                        err instanceof Error ? err.message : String(err);
+                    await channel
+                        .send(`⚠️ 썸네일 생성 실패: ${msg.slice(0, 300)}`)
+                        .catch(() => {});
+                }
+                return;
+            }
+
+            // (1-b) 캡션이 없으면 → 첫 사진을 그대로 썸네일로
             try {
-                const resp = await fetch(imageAttach.url);
+                const first = imageAttaches[0];
+                const resp = await fetch(first.url);
                 const buf = Buffer.from(await resp.arrayBuffer());
                 const url = await uploadBuffer(
                     buf,
-                    imageAttach.name ?? "thumbnail.png",
-                    imageAttach.contentType ?? "image/png"
+                    first.name ?? "thumbnail.png",
+                    first.contentType ?? "image/png"
                 );
                 session.draft.thumbnailUrl = url;
-                await channel.send("🖼️ 썸네일을 설정했어요.");
+                await channel.send(
+                    "🖼️ 사진을 썸네일로 설정했어요. _(프롬프트를 같이 적어 보내면 그 사진을 참고해 AI로 새로 만들어드려요.)_"
+                );
                 await channel.send(buildDraftMessage(session.draft));
             } catch (err) {
                 console.error("⚠️ 썸네일 업로드 실패:", err);
