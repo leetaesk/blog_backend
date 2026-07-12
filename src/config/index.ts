@@ -14,6 +14,8 @@ const config = {
   discord: {
     // 데이터 변경(새 댓글/가입 등) 알림을 보낼 디스코드 Incoming Webhook URL
     webhookUrl: process.env.DISCORD_WEBHOOK_URL,
+    // 매일 아침 "오늘의 개발지식"을 보낼 전용 채널의 Incoming Webhook URL
+    dailyWebhookUrl: process.env.DISCORD_DAILY_WEBHOOK_URL,
     // 글쓰기 봇 (Gateway)
     botToken: process.env.DISCORD_BOT_TOKEN,
     ownerId: process.env.DISCORD_OWNER_ID, // 봇을 쓸 수 있는 유일한 디스코드 user id

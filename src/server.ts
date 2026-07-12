@@ -12,6 +12,7 @@ import usersRouter from "./users/users.route";
 import { SitemapStream, streamToPromise } from "sitemap";
 import { createGzip } from "zlib";
 import { startBot } from "./bot";
+import { startDailyKnowledge } from "./daily/dailyKnowledge";
 
 const app = express();
 app.set("trust proxy", 1); // 프록시 서버를 통한 요청을 신뢰
@@ -173,4 +174,7 @@ app.listen(port, "0.0.0.0", () => {
 
     // 디스코드 글쓰기 봇 시작 (토큰 없으면 내부에서 자동 비활성화)
     startBot();
+
+    // 매일 아침 8시 "오늘의 개발지식" 크론잡 (웹훅 URL 없으면 자동 비활성화)
+    startDailyKnowledge();
 });

@@ -553,6 +553,22 @@ ALTER TABLE ONLY public.posts
 
 
 --
+-- Name: daily_knowledge; Type: TABLE; Schema: public; Owner: postgres
+-- (코드에서 CREATE TABLE IF NOT EXISTS로 관리됨 — src/daily/dailyKnowledge.ts)
+--
+
+CREATE TABLE IF NOT EXISTS public.daily_knowledge (
+    id SERIAL PRIMARY KEY,
+    topic character varying(255) NOT NULL UNIQUE,
+    field character varying(50) NOT NULL,
+    keywords text[] NOT NULL DEFAULT '{}',
+    content text NOT NULL,
+    sent_on date NOT NULL UNIQUE,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
 -- PostgreSQL database dump complete
 --
 
