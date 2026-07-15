@@ -73,6 +73,43 @@ const registerCommands = async (clientId: string): Promise<void> => {
     console.log(`✅ 슬래시 명령 등록 완료 (${commands.length}개, guild)`);
 };
 
+// Claude 응답 대기 중 로딩 인디케이터.
+//  · "생각하는 중…" 메시지에 움직이는 진행바를 그리고 타이핑 표시를 갱신한다.
+//  · 반환된 stop()을 호출하면 인터벌을 멈추고 로딩 메시지를 지운다.
+const startLoading = (
+    channel: TextChannel | ThreadChannel,
+    label = "생각하는 중"
+): (() => Promise<void>) => {
+    const WIDTH = 12;
+    let frame = 0;
+    let placeholder: Message | null = null;
+
+    channel.sendTyping().catch(() => {});
+    const msgPromise = channel
+        .send(`⏳ ${label}…`)
+        .then((m) => (placeholder = m))
+        .catch(() => null);
+
+    const timer = setInterval(() => {
+        channel.sendTyping().catch(() => {});
+        if (!placeholder) return;
+        // 물결처럼 흐르는 진행바 (좌→우로 채워진 칸이 이동)
+        const pos = frame % (WIDTH + 4);
+        const bar = Array.from({ length: WIDTH }, (_, i) => {
+            const d = Math.abs(i - (pos - 2));
+            return d === 0 ? "█" : d === 1 ? "▓" : d === 2 ? "░" : "·";
+        }).join("");
+        placeholder.edit(`⏳ ${label}…\n\`${bar}\``).catch(() => {});
+        frame += 1;
+    }, 1500);
+
+    return async () => {
+        clearInterval(timer);
+        await msgPromise;
+        await placeholder?.delete().catch(() => {});
+    };
+};
+
 // 디스코드 메시지 길이 한계(2000자)에 맞춰 나눠 전송
 const sendChunked = async (
     channel: TextChannel | ThreadChannel,
@@ -305,7 +342,7 @@ export const startBot = (): void => {
         const content = message.content.trim();
         if (!content && !attachmentText) return;
 
-        await channel.sendTyping().catch(() => {});
+        const stopLoading = startLoading(channel);
 
         try {
             const systemPrompt = buildSystemPrompt(
@@ -318,6 +355,8 @@ export const startBot = (): void => {
             );
             session.claudeSessionId = sessionId;
 
+            await stopLoading();
+
             const { chat, draft } = parseDraft(text);
             await sendChunked(channel, chat);
             if (draft) {
@@ -327,9 +366,17 @@ export const startBot = (): void => {
                 await channel.send(buildDraftMessage(draft));
             }
         } catch (err) {
+            await stopLoading();
             console.error("⚠️ Claude 호출 실패:", err);
+            const detail = (err instanceof Error ? err.message : String(err))
+                .replace(/\s+/g, " ")
+                .slice(0, 500);
             await channel
-                .send("⚠️ 글 생성 중 오류가 났어요. 잠시 후 다시 시도해주세요.")
+                .send(
+                    `⚠️ 글 생성 중 오류가 났어요. 잠시 후 다시 시도해주세요.\n\`\`\`\n${
+                        detail || "(원인 불명)"
+                    }\n\`\`\``
+                )
                 .catch(() => {});
         }
     });

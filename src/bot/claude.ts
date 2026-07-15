@@ -1,8 +1,8 @@
 import spawn from "cross-spawn";
 import os from "os";
 
-// 구독(claude CLI) 사용. 품질 우선이면 "opus"로 변경.
-const MODEL = "sonnet";
+// 구독(claude CLI) 사용. 품질 우선이라 opus 사용(속도 우선이면 "sonnet").
+const MODEL = "opus";
 
 // 초안 블록 구분자
 export const DRAFT_START = "[[[DRAFT]]]";
@@ -116,6 +116,8 @@ export const askClaude = (
     systemPrompt: string
 ): Promise<AskResult> => {
     return new Promise((resolve, reject) => {
+        // CLI가 멈춰서 응답을 영영 안 주는 경우를 대비한 안전장치.
+        const TIMEOUT_MS = 5 * 60 * 1000; // 5분
         const args = [
             "-p",
             "--output-format",
@@ -140,15 +142,38 @@ export const askClaude = (
 
         let stdout = "";
         let stderr = "";
+        let settled = false;
         child.stdout?.on("data", (d) => (stdout += d.toString()));
         child.stderr?.on("data", (d) => (stderr += d.toString()));
 
-        child.on("error", (err) => reject(err));
+        // 응답이 오래 걸리면 프로세스를 죽이고 명확히 실패시킨다.
+        const timer = setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            child.kill("SIGKILL");
+            reject(
+                new Error(
+                    `claude 응답 타임아웃(${TIMEOUT_MS / 1000}초) — 프로세스를 종료했어요.`
+                )
+            );
+        }, TIMEOUT_MS);
+
+        child.on("error", (err) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            reject(err);
+        });
         child.on("close", (code) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
             if (code !== 0) {
                 return reject(
                     new Error(
-                        `claude 종료 코드 ${code}: ${stderr.slice(0, 500)}`
+                        `claude 종료 코드 ${code}: ${
+                            stderr.slice(0, 500) || "(stderr 없음)"
+                        }`
                     )
                 );
             }
@@ -159,8 +184,13 @@ export const askClaude = (
                         new Error(`claude 오류: ${json.result ?? json.subtype}`)
                     );
                 }
+                const result =
+                    typeof json.result === "string" ? json.result : "";
+                if (!result.trim()) {
+                    return reject(new Error("claude가 빈 응답을 반환했어요."));
+                }
                 resolve({
-                    text: typeof json.result === "string" ? json.result : "",
+                    text: result,
                     sessionId: json.session_id ?? null,
                 });
             } catch {
