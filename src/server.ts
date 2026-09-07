@@ -13,6 +13,8 @@ import { SitemapStream, streamToPromise } from "sitemap";
 import { createGzip } from "zlib";
 import { startBot } from "./bot";
 import { startDailyKnowledge } from "./daily/dailyKnowledge";
+import swaggerUi from "swagger-ui-express";
+import { swaggerDocument } from "./swagger";
 
 const app = express();
 app.set("trust proxy", 1); // 프록시 서버를 통한 요청을 신뢰
@@ -62,6 +64,24 @@ app.get("/", (req, res) => {
         env: process.env.NODE_ENV || "development",
     });
 });
+
+app.get("/api-docs.json", (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    res.json(swaggerDocument);
+});
+
+app.use(
+    "/api-docs",
+    swaggerUi.serve,
+    swaggerUi.setup(swaggerDocument, {
+        customSiteTitle: "Leetaesk Blog API",
+        swaggerOptions: {
+            docExpansion: "list",
+            displayRequestDuration: true,
+            persistAuthorization: true,
+        },
+    }),
+);
 
 // sitemap.xml 라우터
 app.get("/sitemap.xml", async (req, res) => {
